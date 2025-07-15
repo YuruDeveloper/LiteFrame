@@ -1,24 +1,24 @@
 package Tree
 
-import Componet "LiteFrame/Router/Tree/Componet"
+import Component "LiteFrame/Router/Tree/Component"
 
 type RootNode struct {
-	Identity *Componet.Identity
-	Container *Componet.Container[Componet.Node]
+	Identity Component.Identity
+	Container Component.Container[Component.Node]
 }
 
 func NewRootNode() RootNode {
 	return RootNode{
-		Identity: Componet.NewIdentity(Componet.High,Componet.RootType,false),
-		Container: Componet.NewContainer(Componet.NewError(Componet.RootType,"","/")),
+		Identity: Component.NewIdentity(Component.High,Component.RootType,false),
+		Container: Component.NewContainer(Component.NewError(Component.RootType,"","/")),
 	}
 }
 
-func (Instance *RootNode) GetPriority() Componet.PriorityLevel {
+func (Instance *RootNode) GetPriority() Component.PriorityLevel {
 	return Instance.Identity.GetPriority()
 }
 
-func (Instance *RootNode) GetType() Componet.NodeType {
+func (Instance *RootNode) GetType() Component.NodeType {
 	return Instance.Identity.GetType()
 }
 
@@ -26,7 +26,7 @@ func (Instance *RootNode) IsLeaf() bool {
 	return Instance.Identity.IsLeaf()
 }
 
-func (Instance *RootNode) AddChild(Path string, Child Componet.Node) error {
+func (Instance *RootNode) AddChild(Path string, Child Component.Node) error {
 	return  Instance.Container.AddChild(Path,Child)
 }
 
@@ -38,7 +38,7 @@ func (Instance *RootNode) GetChildrenLength() int {
 	return Instance.Container.GetChildrenLength()
 }
 
-func (Instance *RootNode) GetChild(Path string) Componet.Node {
+func (Instance *RootNode) GetChild(Path string) Component.Node {
 	return Instance.Container.GetChild(Path)
 }
 
@@ -50,6 +50,6 @@ func (Instance *RootNode) DeleteChild(Key string) error {
 	return Instance.Container.DeleteChild(Key)
 }
 
-func (Instance *RootNode) GetAllChildren() []Componet.Node {
+func (Instance *RootNode) GetAllChildren() []Component.Node {
 	return Instance.Container.GetAllChildren()
 }

@@ -1,29 +1,30 @@
 package Tree
 
 import (
+    Component "LiteFrame/Router/Tree/Component"
 	"net/http"
-	Componet "LiteFrame/Router/Tree/Componet"
 )
 
 type StaticNode struct {
-	Identity *Componet.Identity
-	PathContainer *Componet.PathContainerNode[Componet.Node]
-	EndPoint *Componet.EndPoint
+	Identity Component.Identity
+	PathContainer Component.PathContainer[Component.Node]
+	EndPoint *Component.EndPoint
 }
 
 func NewStaticNode(Path string) StaticNode {
 	return StaticNode{
-		Identity: Componet.NewIdentity(Componet.High, Componet.StaticType, false),
-		PathContainer: Componet.NewPathContainerNode(Componet.NewError(Componet.StaticType,"",Path),Path),
+		Identity: Component.NewIdentity(Component.High, Component.StaticType, false),
+		PathContainer: Component.NewPathContainerNode(Component.NewError(Component.StaticType,"",Path),Path),
 		EndPoint: nil,
 	}
+	
 }
 
-func (Instance *StaticNode) GetPriority() Componet.PriorityLevel {
+func (Instance *StaticNode) GetPriority() Component.PriorityLevel {
 	return Instance.Identity.GetPriority()
 }
 
-func (Instance *StaticNode) GetType() Componet.NodeType {
+func (Instance *StaticNode) GetType() Component.NodeType {
 	return Instance.Identity.GetType()
 }
 
@@ -43,18 +44,24 @@ func (Instance *StaticNode) Match(Path string) (bool, int, string) {
 	return  Instance.PathContainer.Match(Path)
 }
 
-func (Instance *StaticNode) Split(SplitPoint int, NewNode *Componet.PathContainerNode[Componet.Node]) (*Componet.PathContainerNode[Componet.Node],error) {
+func (Instance *StaticNode) Split(SplitPoint int, NewNode *Component.PathContainer[Component.Node]) (Component.PathContainer[Component.Node],error) {
 	Result , Err := Instance.PathContainer.Split(SplitPoint, *NewNode)
 	if Err != nil {
 		return nil , Err
 	}
-	if Instance.EndPoint != nil {
-		// TODO: EndPoint 핸들러들을 NewNode로 복사하는 로직 구현 필요
+	if HandlerNode , Ok := Result.(Component.HandlerNode) ; Ok {
+		for _ , Method := range Instance.GetAllMethods() {
+			HandlerNode.SetHandler(Method,Instance.GetHandler(Method))
+		}
+		for _ , Method := range Instance.GetAllMethods() {
+			Instance.DeleteHandler(Method)
+		}
 	}
-	return &Result , nil
+	return Result , nil
+	//return &Result , nil
 }
 
-func (Instance *StaticNode) AddChild(Path string, Child Componet.Node) error {
+func (Instance *StaticNode) AddChild(Path string, Child Component.Node) error {
 	return  Instance.PathContainer.AddChild(Path,Child)
 }
 
@@ -66,7 +73,7 @@ func (Instance *StaticNode) GetChildrenLength() int {
 	return Instance.PathContainer.GetChildrenLength()
 }
 
-func (Instance *StaticNode) GetChild(Path string) Componet.Node {
+func (Instance *StaticNode) GetChild(Path string) Component.Node {
 	return Instance.PathContainer.GetChild(Path)
 }
 
@@ -78,7 +85,7 @@ func (Instance *StaticNode) DeleteChild(Key string) error {
 	return Instance.PathContainer.DeleteChild(Key)
 }
 
-func (Instance *StaticNode) GetAllChildren() []Componet.Node {
+func (Instance *StaticNode) GetAllChildren() []Component.Node {
 	return Instance.PathContainer.GetAllChildren()
 }
 
@@ -91,7 +98,7 @@ func (Instance *StaticNode) GetHandler(Method string) http.HandlerFunc {
 
 func (Instance *StaticNode) SetHandler(Method string,Handler http.HandlerFunc) error {
 	if Instance.EndPoint == nil {
-		Instance.EndPoint = Componet.NewEndPoint(Componet.NewError(Componet.StaticType,"",Instance.PathContainer.GetPath()))
+		Instance.EndPoint = Component.NewEndPoint(Component.NewError(Component.StaticType,"",Instance.PathContainer.GetPath()))
 	}
 	return Instance.EndPoint.SetHandler(Method,Handler)
 }	
@@ -112,7 +119,7 @@ func (Instance *StaticNode) GetAllHandlers() map[string]http.HandlerFunc {
 
 func (Instance *StaticNode) DeleteHandler(Method string) error {
 	if Instance.EndPoint == nil {
-		return Componet.NewError(Componet.StaticType, "No handlers to delete", Instance.PathContainer.GetPath())
+		return Component.NewError(Component.StaticType, "No handlers to delete", Instance.PathContainer.GetPath())
 	}
 	return Instance.EndPoint.DeleteHandler(Method)
 }

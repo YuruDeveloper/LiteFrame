@@ -1,8 +1,8 @@
-package Componet
+package Component
 
-func NewContainer(Error error) *Container[Node] {
+func NewContainer(Error error) Container[Node] {
 	Err := Error.(*NodeError)
-	return &Container[Node]{
+	return Container[Node]{
 		Error: *Err,
 		Box:   make(map[string]Node),
 	}

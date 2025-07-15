@@ -2,30 +2,30 @@ package Tree
 
 import (
 	"net/http"
-	Componet "LiteFrame/Router/Tree/Componet"
+	Component "LiteFrame/Router/Tree/Component"
 )
 
 type CatchAllNode struct {
-	Identity *Componet.Identity
-	PathHandler *Componet.PathHandler
-	EndPoint *Componet.EndPoint
+	Identity Component.Identity
+	PathHandler Component.PathHandler
+	EndPoint *Component.EndPoint
 }
 func NewCatchAllNode(Path string) CatchAllNode {
 	Node := CatchAllNode{
-		Identity: Componet.NewIdentity(Componet.Low, Componet.CatchAllType, true),
-		PathHandler: Componet.NewPathHandler(Componet.NewError(Componet.CatchAllType,"",Path), Path),
-		EndPoint: Componet.NewEndPoint(Componet.NewError(Componet.CatchAllType,"",Path)),
+		Identity: Component.NewIdentity(Component.Low, Component.CatchAllType, true),
+		PathHandler: Component.NewPathHandler(Component.NewError(Component.CatchAllType,"",Path), Path),
+		EndPoint: Component.NewEndPoint(Component.NewError(Component.CatchAllType,"",Path)),
 	}
 	return Node 
 	
 }
 
 
-func (Instance *CatchAllNode) GetPriority() Componet.PriorityLevel {
+func (Instance *CatchAllNode) GetPriority() Component.PriorityLevel {
 	return Instance.Identity.GetPriority()
 }
 
-func (Instance *CatchAllNode) GetType() Componet.NodeType {
+func (Instance *CatchAllNode) GetType() Component.NodeType {
 	return Instance.Identity.GetType()
 }
 
@@ -66,7 +66,7 @@ func (Instance *CatchAllNode) GetAllHandlers() map[string]http.HandlerFunc {
 
 func (Instance *CatchAllNode) DeleteHandler(Method string) error {
 	if Instance.EndPoint == nil {
-		return Componet.NewError(Componet.CatchAllType, "No handlers to delete", Instance.GetPath())
+		return Component.NewError(Component.CatchAllType, "No handlers to delete", Instance.GetPath())
 	}
 	return Instance.EndPoint.DeleteHandler(Method)
 }

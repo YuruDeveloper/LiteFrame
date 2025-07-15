@@ -4,7 +4,7 @@ import (
 	"LiteFrame/Router/Middleware"
 	"net/http"
 	"strings"
-	Componet "LiteFrame/Router/Tree/Componet"
+	Component "LiteFrame/Router/Tree/Component"
 
 )
 
@@ -18,7 +18,7 @@ func (Instance *NodeFactory) IsCatchAll(Input string) bool {
 	return Input == "*"
 }
 
-func (Instance *NodeFactory) CreateNode(Path string) Componet.Node {
+func (Instance *NodeFactory) CreateNode(Path string) Component.Node {
 	switch {
 		case Instance.IsWildCard(Path):
 		  	Node := NewWildCardNode(Path) 
@@ -32,11 +32,11 @@ func (Instance *NodeFactory) CreateNode(Path string) Componet.Node {
 	}
 }
 
-func (Instance *NodeFactory) CreateHandlerNode(Path string,Method string,Handler http.HandlerFunc) (Componet.HandlerNode ,error) {
+func (Instance *NodeFactory) CreateHandlerNode(Path string,Method string,Handler http.HandlerFunc) (Component.HandlerNode ,error) {
 	Node := Instance.CreateNode(Path)
-	HandlerNode, Ok := Node.(Componet.HandlerNode)
+	HandlerNode, Ok := Node.(Component.HandlerNode)
 	if !Ok {
-		return nil , Componet.NewError(Node.GetType(),"Created Node Does not implement HandlerNode",Path)
+		return nil , Component.NewError(Node.GetType(),"Created Node Does not implement HandlerNode",Path)
 	}
 	if Err := HandlerNode.SetHandler(Method,Handler); Err != nil {
 		return nil , Err
@@ -65,7 +65,7 @@ func (Instance *Tree) IsWildCard(Input string) bool {
 }
 
 func (Instance *Tree) IsCatchAll(Input string) bool {
-	return Input == "*"
+	return Input[0] == '*'
 }
 
 func (Instance *Tree) SplitPath(Path string) []string {
@@ -80,7 +80,7 @@ func (Instance *Tree) SplitPath(Path string) []string {
 
 func (Instance *Tree) Add(Method string, Path string, Handler http.HandlerFunc) error {
 	if Method == "" || Path == "" || Handler == nil {
-		return Componet.NewError(Componet.RootType,"Invalid Parameters , Path and HJandler are Reqired","/")
+		return Component.NewError(Component.RootType,"Invalid Parameters , Path and HJandler are Reqired","/")
 	}
 	Paths := Instance.SplitPath(Path)
 	if len(Paths) == 0 {
@@ -93,10 +93,10 @@ func (Instance *Tree) AddRootHandler(Method string,Handler http.HandlerFunc) err
 	RootKey := "/"
 	if Instance.Root.HasChildren() {
 		if Child := Instance.Root.GetChild(RootKey); Child != nil {
-			if HandlerNode , OK := Child.(Componet.HandlerNode); OK {
+			if HandlerNode , OK := Child.(Component.HandlerNode); OK {
 				return HandlerNode.SetHandler(Method,Handler)
 			}
-			return Componet.NewError(Componet.RootType,"Root Node is not a Handler Node","/")
+			return Component.NewError(Component.RootType,"Root Node is not a Handler Node","/")
 		}
 	}
 
@@ -109,7 +109,7 @@ func (Instance *Tree) AddRootHandler(Method string,Handler http.HandlerFunc) err
 
 
 
-func (Instance *Tree) AddHelper(Parent Componet.NodeContainer[Componet.Node],Paths []string,Method string,Handler http.HandlerFunc) error {
+func (Instance *Tree) AddHelper(Parent Component.NodeContainer[Component.Node],Paths []string,Method string,Handler http.HandlerFunc) error {
 	if len(Paths) == 0 {
 		return nil
 	}
@@ -126,9 +126,9 @@ func (Instance *Tree) AddHelper(Parent Componet.NodeContainer[Componet.Node],Pat
 	return nil
 }
 
-func (Instance *Tree) CreateNewNode(Parent Componet.NodeContainer[Componet.Node],Paths []string,Method string,Handler http.HandlerFunc) error {
+func (Instance *Tree) CreateNewNode(Parent Component.NodeContainer[Component.Node],Paths []string,Method string,Handler http.HandlerFunc) error {
 	if len(Paths) == 0 {
-		return Componet.NewError(Parent.(Componet.Node).GetType(),"Path is empty","")
+		return Component.NewError(Parent.(Component.Node).GetType(),"Path is empty","")
 	}
 	if len(Paths) == 1 {
 		Node , Err :=  Instance.NodeFactory.CreateHandlerNode(Paths[0],Method,Handler)
@@ -145,15 +145,15 @@ func (Instance *Tree) CreateNewNode(Parent Componet.NodeContainer[Componet.Node]
 	if Err := Parent.AddChild(Paths[0],Container); Err != nil {
 		return  Err
 	}
-	MewParent , Ok := Container.(Componet.NodeContainer[Componet.Node])
+	MewParent , Ok := Container.(Component.NodeContainer[Component.Node])
 	if !Ok {
-		return Componet.NewError(Container.GetType(),"Fail Transform NodeContainer", Paths[0])
+		return Component.NewError(Container.GetType(),"Fail Transform NodeContainer", Paths[0])
 	}
 	return Instance.AddHelper(MewParent,Paths[1:],Method,Handler)
 }
 
 
-func (Instance *Tree) TryMatch(Parent Componet.NodeContainer[Componet.Node],Paths []string,Method string,Handler http.HandlerFunc) (bool,error) {
+func (Instance *Tree) TryMatch(Parent Component.NodeContainer[Component.Node],Paths []string,Method string,Handler http.HandlerFunc) (bool,error) {
 	for _ , Child := range Parent.GetAllChildren() {
 		Matched , Err := Instance.MatchNode(Parent,Child,Paths,Method,Handler)
 		if Err != nil {
@@ -166,42 +166,45 @@ func (Instance *Tree) TryMatch(Parent Componet.NodeContainer[Componet.Node],Path
 	return false , nil
 }
 
-func (Instance *Tree) MatchNode(Parent Componet.NodeContainer[Componet.Node],Child Componet.Node,Paths []string,Method string,Handler http.HandlerFunc) (bool, error) {
-	PathNode , Ok := Child.(Componet.PathNode)
+func (Instance *Tree) MatchNode(Parent Component.NodeContainer[Component.Node],Child Component.Node,Paths []string,Method string,Handler http.HandlerFunc) (bool, error) {
+	PathNode , Ok := Child.(Component.PathNode)
 	if !Ok {
-		return false , Componet.NewError(Child.GetType(),"Child Node is not PathNode","")
+		return false , Component.NewError(Child.GetType(),"Child Node is not PathNode","")
 	}
 	Matched, MatchingChar , LeftPath  := PathNode.Match(Paths[0])
+
 	if Matched {
+		// Full match of the node's path
 		Err := Instance.HandleMatchedNode(Child,Paths,Method,Handler)
 		return true , Err
-	}
-	if MatchingChar < len(PathNode.GetPath()) {
+	} else if MatchingChar > 0 && MatchingChar < len(PathNode.GetPath()) {
+		// Partial match: some characters matched, but not the whole node path
 		return true , Instance.HandlePartialMatchedNode(Parent,Child,Paths,MatchingChar,LeftPath,Method,Handler)
 	}
-	return false , Componet.NewError(Child.GetType(),"UnExpected Error",PathNode.GetPath())
+	// No match or no common prefix
+	return false , nil
 }
 
-func (Instance *Tree) HandleMatchedNode(Child Componet.Node,Paths []string,Method string,Handler http.HandlerFunc) error {
+func (Instance *Tree) HandleMatchedNode(Child Component.Node,Paths []string,Method string,Handler http.HandlerFunc) error {
 	switch len(Paths) {
 		case 1:
-			HandlerNode , Ok := Child.(Componet.HandlerNode)
+			HandlerNode , Ok := Child.(Component.HandlerNode)
 			if !Ok {
-				return Componet.NewError(Child.GetType(),"Leaf Node is not HandlerNode","")
+				return Component.NewError(Child.GetType(),"Leaf Node is not HandlerNode","")
 			}
 			return  HandlerNode.SetHandler(Method,Handler)
 		default: 
-			Container , Ok := Child.(Componet.NodeContainer[Componet.Node])
+			Container , Ok := Child.(Component.NodeContainer[Component.Node])
 			if !Ok {
-				return Componet.NewError(Child.GetType(),"Node is not nodeContainer","")
+				return Component.NewError(Child.GetType(),"Node is not nodeContainer","")
 			}
 			return Instance.AddHelper(Container,Paths[1:],Method,Handler)
 	}
 }
-func (Instance *Tree) HandlePartialMatchedNode(Parent Componet.NodeContainer[Componet.Node],Child Componet.Node,Paths []string,MatchingCHar int,LeafPath string,Method string,Handler http.HandlerFunc) error {
+func (Instance *Tree) HandlePartialMatchedNode(Parent Component.NodeContainer[Component.Node],Child Component.Node,Paths []string,MatchingCHar int,LeafPath string,Method string,Handler http.HandlerFunc) error {
 	StaticNode , Ok := Child.(*StaticNode)
 	if !Ok {
-		return Componet.NewError(Child.GetType(),"Error Child is not StaticNode","")
+		return Component.NewError(Child.GetType(),"Error Child is not StaticNode","")
 	}
 	NewNode , Err:= Instance.SplitNode(*StaticNode,Parent,MatchingCHar,Paths,Method,Handler)
 	if Err != nil {
@@ -210,10 +213,8 @@ func (Instance *Tree) HandlePartialMatchedNode(Parent Componet.NodeContainer[Com
 	Paths[0] =LeafPath
 	return Instance.AddHelper(NewNode,Paths,Method,Handler)
 }
-func (Instance *Tree) SplitNode(TargetNode StaticNode, Parent Componet.NodeContainer[Componet.Node],SplitPoint int , Paths []string,Method string,Handler http.HandlerFunc) (Componet.NodeContainer[Componet.Node] ,error) {
-	// 자식 노드들 백업
-	OriginalChildren := TargetNode.GetAllChildren()
-	
+func (Instance *Tree) SplitNode(TargetNode StaticNode, Parent Component.NodeContainer[Component.Node],SplitPoint int , Paths []string,Method string,Handler http.HandlerFunc) (Component.NodeContainer[Component.Node] ,error) {
+
 	Path := TargetNode.GetPath()
 	CommonPrefix := Path[:SplitPoint]
 	RemainingSuffix := Path[SplitPoint:]
@@ -225,29 +226,12 @@ func (Instance *Tree) SplitNode(TargetNode StaticNode, Parent Componet.NodeConta
 		return nil ,Err
 	}
 
-	NewChild , Err:= TargetNode.Split(SplitPoint, NewParent.PathContainer)
+	NewChild , Err:= TargetNode.Split(SplitPoint, &NewParent.PathContainer)
 	if Err != nil {
-		return nil , Componet.NewError(TargetNode.GetType(),"Fail to Split Node",TargetNode.GetPath())
+		return nil , Component.NewError(TargetNode.GetType(),"Fail to Split Node",TargetNode.GetPath())
 	}
 	
-	Parent.AddChild(NewChild.GetPath(), &NewParent)
-
-	if TargetNode.GetPath() != "" {
-		NewParent.AddChild(TargetNode.GetPath(), &TargetNode)
-		// 원래 노드의 모든 자식들을 복원
-		for _ , Child := range OriginalChildren {
-			if PathChild, ok := Child.(Componet.PathNode); ok {
-				TargetNode.AddChild(PathChild.GetPath(), Child)
-			}
-		}
-	}
-	Matched , _ , _ := TargetNode.Match(Paths[0])
-	if Matched {
-		if Err := NewParent.SetHandler(Method,Handler); Err != nil {
-			return nil , Err
-		}
-		return nil , nil
-	} 
+	Parent.AddChild(NewChild.GetPath(), NewChild.(Component.Node))
 	return &NewParent , nil
 }
 
@@ -294,7 +278,7 @@ func (Tree *Tree) AddMiddleware(Middleware Middleware.Middleware) {
 //    - ContainerNode라면 모든 자식 노드에 재귀 호출
 // 3. 현재 노드가 HandlerNode인지 확인
 //    - HandlerNode라면 기존 핸들러를 미들웨어로 래핑
-func (Tree *Tree) ApplyMiddlewareToAllNodes(Node Componet.Node, Middleware Middleware.Middleware) {
+func (Tree *Tree) ApplyMiddlewareToAllNodes(Node Component.Node, Middleware Middleware.Middleware) {
 	// 구현 예정
 }
 
@@ -323,26 +307,26 @@ func (Instance *Tree) Search(Request *http.Request) http.Handler {
 		if Child == nil {
 			return Instance.NotFoundHandler
 		}
-		if !Child.(Componet.HandlerNode).HasMethod(Request.Method) {
+		if !Child.(Component.HandlerNode).HasMethod(Request.Method) {
 			return Instance.NotAllowedHandler
 		}
-		return Child.(Componet.HandlerNode).GetHandler(Request.Method)
+		return Child.(Component.HandlerNode).GetHandler(Request.Method)
 	}
 	return Instance.SearchHelper(&Instance.Root,make([]any,0),Paths,Request.Method)
 }
 
-func (Instance *Tree) SearchHelper(SearchTarget Componet.Node,ApplyList []any,Paths []string, Method string) http.Handler {
-	for _ , Child := range SearchTarget.(Componet.NodeContainer[Componet.Node]).GetAllChildren() {
+func (Instance *Tree) SearchHelper(SearchTarget Component.Node,ApplyList []any,Paths []string, Method string) http.Handler {
+	for _ , Child := range SearchTarget.(Component.NodeContainer[Component.Node]).GetAllChildren() {
 		switch Child.GetType() {
-			case Componet.MiddlewareType:
-				Temp := Child.(Componet.MiddlewareAcessor).Apply
+			case Component.MiddlewareType:
+				Temp := Child.(Component.MiddlewareAcessor).Apply
 				ApplyList = append(ApplyList, Temp)
 				Result := Instance.SearchHelper(Child,ApplyList,Paths,Method)
 				if Result != nil {
 					return Result
 				}
-			case Componet.StaticType:
-				Mathced , count , LeftPath  := Child.(Componet.PathNode).Match(Paths[0])
+			case Component.StaticType:
+				Mathced , count , LeftPath  := Child.(Component.PathNode).Match(Paths[0])
 				if Mathced {
 					Result := Instance.SearchHelper(Child,ApplyList,Paths[1:],Method)
 					return Result
@@ -353,7 +337,7 @@ func (Instance *Tree) SearchHelper(SearchTarget Componet.Node,ApplyList []any,Pa
 				Paths[0] = LeftPath
 				Result := Instance.SearchHelper(Child,ApplyList,Paths,Method)
 				return Result
-			case Componet.WildCardType:
+			case Component.WildCardType:
 
 		}
 	}

@@ -3,35 +3,34 @@ package Tree
 import (
 	"context"
 	"net/http"
-	Componet "LiteFrame/Router/Tree/Componet"
+	Component "LiteFrame/Router/Tree/Component"
 )
 
-type treeKey string
-
 type WildCardNode struct {
-	Identity *Componet.Identity
-	Container *Componet.Container[Componet.Node]
-	PathHandler *Componet.PathHandler
-	EndPoint *Componet.EndPoint
+	Identity Component.Identity
+	Container Component.Container[Component.Node]
+	PathHandler Component.PathHandler
+	EndPoint *Component.EndPoint
 	Data string
 }
 
+
 func NewWildCardNode(Path string) WildCardNode {
 	WildCardNode :=  WildCardNode{
-		Identity: Componet.NewIdentity(Componet.Middle, Componet.WildCardType, false),
-		PathHandler: Componet.NewPathHandler(Componet.NewError(Componet.WildCardType,"",Path), Path[1:]),
-		Container: Componet.NewContainer(Componet.NewError(Componet.WildCardType,"",Path)),
+		Identity: Component.NewIdentity(Component.Middle, Component.WildCardType, false),
+		PathHandler: Component.NewPathHandler(Component.NewError(Component.WildCardType,"",Path), Path[1:]),
+		Container: Component.NewContainer(Component.NewError(Component.WildCardType,"",Path)),
 		EndPoint: nil,
 		Data: "",
 	}
 	return  WildCardNode
 }
 
-func (Instance *WildCardNode) GetPriority() Componet.PriorityLevel {
+func (Instance *WildCardNode) GetPriority() Component.PriorityLevel {
 	return Instance.Identity.GetPriority()
 }
 
-func (Instance *WildCardNode) GetType() Componet.NodeType {
+func (Instance *WildCardNode) GetType() Component.NodeType {
 	return Instance.Identity.GetType()
 }
 
@@ -55,11 +54,15 @@ func (Instance *WildCardNode) Match(Path string) (bool, int, string) {
 	return true, len(Path), Path
 } 
 
-func (Instance *WildCardNode) AddChild(Path string, Child Componet.Node) error {
+func (Instance *WildCardNode) AddChild(Path string, Child Component.Node) error {
 	return Instance.Container.AddChild(Path, Child)
 }
 
-func (Instance *WildCardNode) GetChild(Path string) Componet.Node {
+func (Instance *WildCardNode) SetChild(Path string, New string) error {
+	return Instance.Container.SetChild(Path, New)
+}
+
+func (Instance *WildCardNode) GetChild(Path string) Component.Node {
 	return Instance.Container.GetChild(Path)
 }
 
@@ -71,7 +74,7 @@ func (Instance *WildCardNode) GetChildrenLength() int {
 	return Instance.Container.GetChildrenLength()
 }
 
-func (Instance *WildCardNode) GetAllChildren() []Componet.Node {
+func (Instance *WildCardNode) GetAllChildren() []Component.Node {
 	return Instance.Container.GetAllChildren()
 }
 
@@ -95,7 +98,7 @@ func (Instance *WildCardNode) GetHandler(Method string) http.HandlerFunc {
 
 func (Instance *WildCardNode) SetHandler(Method string, Handler http.HandlerFunc) error {
 	if Instance.EndPoint == nil {
-		Instance.EndPoint = Componet.NewEndPoint(Componet.NewError(Componet.WildCardType,"",Instance.GetPath()))
+		Instance.EndPoint = Component.NewEndPoint(Component.NewError(Component.WildCardType,"",Instance.GetPath()))
 	}
 	return Instance.EndPoint.SetHandler(Method, Handler)
 }
@@ -109,7 +112,7 @@ func (Instance *WildCardNode) GetAllHandlers() map[string]http.HandlerFunc {
 
 func (Instance *WildCardNode) DeleteHandler(Method string) error {
 	if Instance.EndPoint == nil {
-		return Componet.NewError(Componet.WildCardType, "No handlers to delete", Instance.GetPath())
+		return Component.NewError(Component.WildCardType, "No handlers to delete", Instance.GetPath())
 	}
 	return Instance.EndPoint.DeleteHandler(Method)
 }
@@ -130,7 +133,7 @@ func (Instance *WildCardNode) GetAllMethods() []string {
 
 func (Instance *WildCardNode) SetWildCard(Handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(Writer http.ResponseWriter, Request *http.Request) {
-		var contextKey treeKey = treeKey(Instance.PathHandler.GetPath())
+		var contextKey Component.TreeKey = Component.TreeKey(Instance.PathHandler.GetPath())
 		ctx := context.WithValue(Request.Context(), contextKey, Instance.Data)
 		NewRequest := Request.WithContext(ctx)
 		Handler.ServeHTTP(Writer, NewRequest)

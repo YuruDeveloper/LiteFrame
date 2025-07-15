@@ -3,28 +3,28 @@ package Tree
 import (
 	"LiteFrame/Router/Middleware"
 	"net/http"
-	Componet "LiteFrame/Router/Tree/Componet"
+	Component "LiteFrame/Router/Tree/Component"
 )
 
 type MiddlewareNode struct {
-	Identity *Componet.Identity
-	Container *Componet.Container[Componet.Node]
-	MiddlewareHandler *Componet.MiddlewareHandler
+	Identity Component.Identity
+	Container Component.Container[Component.Node]
+	MiddlewareHandler *Component.MiddlewareHandler
 }
 
 func NewMiddlewareNode() MiddlewareNode {
 	return MiddlewareNode{
-		Identity: Componet.NewIdentity(Componet.High, Componet.MiddlewareType, false),
-		Container: Componet.NewContainer(Componet.NewError(Componet.MiddlewareType,"","")),
-		MiddlewareHandler: Componet.NewMiddlewareHandler(Componet.NewError(Componet.MiddlewareType,"","")),
+		Identity: Component.NewIdentity(Component.High, Component.MiddlewareType, false),
+		Container: Component.NewContainer(Component.NewError(Component.MiddlewareType,"","")),
+		MiddlewareHandler: Component.NewMiddlewareHandler(Component.NewError(Component.MiddlewareType,"","")),
 	}
 }
 
-func (Instance *MiddlewareNode) GetPriority() Componet.PriorityLevel {
+func (Instance *MiddlewareNode) GetPriority() Component.PriorityLevel {
 	return Instance.Identity.GetPriority()
 }
 
-func (Instance *MiddlewareNode) GetType() Componet.NodeType {
+func (Instance *MiddlewareNode) GetType() Component.NodeType {
 	return Instance.Identity.GetType()
 }
 
@@ -32,7 +32,7 @@ func (Instance *MiddlewareNode) IsLeaf() bool {
 	return Instance.Identity.IsLeaf()
 }
 
-func (Instance *MiddlewareNode) AddChild(Path string, Child Componet.Node) error {
+func (Instance *MiddlewareNode) AddChild(Path string, Child Component.Node) error {
 	return  Instance.Container.AddChild(Path,Child)
 }
 
@@ -44,7 +44,7 @@ func (Instance *MiddlewareNode) GetChildrenLength() int {
 	return Instance.Container.GetChildrenLength()
 }
 
-func (Instance *MiddlewareNode) GetChild(Path string) Componet.Node {
+func (Instance *MiddlewareNode) GetChild(Path string) Component.Node {
 	return Instance.Container.GetChild(Path)
 }
 
@@ -65,6 +65,6 @@ func (Instance *MiddlewareNode) DeleteChild(Key string) error {
 	return Instance.Container.DeleteChild(Key)
 }
 
-func (Instance *MiddlewareNode) GetAllChildren() []Componet.Node {
+func (Instance *MiddlewareNode) GetAllChildren() []Component.Node {
 	return Instance.Container.GetAllChildren()
 }

@@ -1,4 +1,4 @@
-package Componet
+package Component
 
 type NodeError struct {
 	Type    NodeType
