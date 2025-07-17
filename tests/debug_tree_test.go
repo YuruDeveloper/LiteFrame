@@ -24,7 +24,7 @@ func TestDebugTreeStructure(t *testing.T) {
 		}
 
 		fmt.Println("Tree structure after adding route:")
-		printTreeStructure(&tree.RootNode, 0)
+		printTreeStructure(tree.RootNode, 0)
 
 		// Debug path splitting
 		paths := tree.SplitPath(route)

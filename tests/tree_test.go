@@ -176,13 +176,13 @@ func TestInsertHandler(t *testing.T) {
 	for _, method := range validMethods {
 		t.Run("valid_method_"+method, func(t *testing.T) {
 			node := Tree.NewNode(Tree.StaticType, "/test")
-			err := tree.InsertHandler(&node, method, handler)
+			err := tree.InsertHandler(node, method, handler)
 
 			if err != nil {
 				t.Errorf("InsertHandler() with method %s returned error: %v", method, err)
 			}
 
-			if node.Handlers[Tree.MethodType(method)] == nil {
+			if node.Handlers[Tree.MethodList[method]] == nil {
 				t.Errorf("Handler for method %s was not set", method)
 			}
 		})
@@ -191,7 +191,7 @@ func TestInsertHandler(t *testing.T) {
 	// Test invalid method
 	t.Run("invalid_method", func(t *testing.T) {
 		node := Tree.NewNode(Tree.StaticType, "/test")
-		err := tree.InsertHandler(&node, "INVALID", handler)
+		err := tree.InsertHandler(node, "INVALID", handler)
 
 		if err == nil {
 			t.Error("Expected error for invalid method, got nil")
@@ -205,7 +205,7 @@ func TestInsertChild(t *testing.T) {
 
 	t.Run("static_child", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		child, err := tree.InsertChild(&parent, "users")
+		child, err := tree.InsertChild(parent, "users")
 
 		if err != nil {
 			t.Errorf("InsertChild() returned error: %v", err)
@@ -226,7 +226,7 @@ func TestInsertChild(t *testing.T) {
 
 	t.Run("wildcard_child", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		child, err := tree.InsertChild(&parent, ":id")
+		child, err := tree.InsertChild(parent, ":id")
 
 		if err != nil {
 			t.Errorf("InsertChild() returned error: %v", err)
@@ -251,7 +251,7 @@ func TestInsertChild(t *testing.T) {
 
 	t.Run("catch_all_child", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		child, err := tree.InsertChild(&parent, "*files")
+		child, err := tree.InsertChild(parent, "*files")
 
 		if err != nil {
 			t.Errorf("InsertChild() returned error: %v", err)
@@ -274,7 +274,7 @@ func TestInsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		parent.WildCard = true
 
-		_, err := tree.InsertChild(&parent, ":id")
+		_, err := tree.InsertChild(parent, ":id")
 
 		if err == nil {
 			t.Error("Expected error for duplicate wildcard, got nil")
@@ -285,7 +285,7 @@ func TestInsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		parent.CatchAll = true
 
-		_, err := tree.InsertChild(&parent, "*files")
+		_, err := tree.InsertChild(parent, "*files")
 
 		if err == nil {
 			t.Error("Expected error for duplicate catch-all, got nil")
@@ -365,9 +365,9 @@ func TestSplitNode(t *testing.T) {
 	t.Run("basic_split", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
-		parent.Children["users"] = &child
+		parent.Children = append(parent.Children, child)
 
-		newNode, err := tree.SplitNode(&parent, &child, 4)
+		newNode, err := tree.SplitNode(parent, child, 4)
 
 		if err != nil {
 			t.Errorf("SplitNode() returned error: %v", err)
@@ -385,11 +385,23 @@ func TestSplitNode(t *testing.T) {
 			t.Errorf("Expected child path 's', got '%s'", child.Path)
 		}
 
-		if _, exists := parent.Children["users"]; exists {
+		found := false
+		for _, c := range parent.Children {
+			if c.Path == "users" {
+				found = true
+			}
+		}
+		if found {
 			t.Error("Original child should be removed from parent")
 		}
 
-		if _, exists := parent.Children["user"]; !exists {
+		found = false
+		for _, c := range parent.Children {
+			if c.Path == "user" {
+				found = true
+			}
+		}
+		if !found {
 			t.Error("New node should be added to parent")
 		}
 	})
@@ -404,7 +416,7 @@ func TestTryMatch(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		paths := []string{"users"}
 
-		matched, err := tree.TryMatch(&parent, paths, "GET", handler)
+		matched, err := tree.TryMatch(parent, paths, "GET", handler)
 
 		if err != nil {
 			t.Errorf("TryMatch() returned error: %v", err)
@@ -418,10 +430,10 @@ func TestTryMatch(t *testing.T) {
 	t.Run("exact_match", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
-		parent.Children["users"] = &child
+		parent.Children = append(parent.Children, child)
 		paths := []string{"users", "123"}
 
-		matched, err := tree.TryMatch(&parent, paths, "GET", handler)
+		matched, err := tree.TryMatch(parent, paths, "GET", handler)
 
 		if err != nil {
 			t.Errorf("TryMatch() returned error: %v", err)

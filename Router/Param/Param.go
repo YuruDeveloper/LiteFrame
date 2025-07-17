@@ -4,6 +4,12 @@ import (
 	"context"
 )
 
+func NewParams() Params {
+	return Params {
+		List: make([]Param, 0),
+	}
+}
+
 type Param struct {
 	Key   string
 	Value string
@@ -13,7 +19,7 @@ type Params struct {
 	List []Param
 }
 
-type Key struct{}
+type Key struct{ }
 
 func (Instance *Params) Add(Key string, Value string) {
 	Instance.List = append(Instance.List, Param{Key: Key, Value: Value})

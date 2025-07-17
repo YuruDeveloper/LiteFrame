@@ -2,6 +2,8 @@ package Tree
 
 import (
 	"LiteFrame/Router/Middleware"
+	"LiteFrame/Router/Param"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,7 +22,7 @@ var MethodList = map[string]MethodType{
 }
 
 type Tree struct {
-	RootNode          Node
+	RootNode          *Node
 	NotFoundHandler   http.HandlerFunc
 	NotAllowedHandler http.HandlerFunc
 	Middlewares       []Middleware.Middleware
@@ -77,6 +79,16 @@ func (Instance *Tree) InsertHandler(Node *Node, Method string, Handler http.Hand
 	return fmt.Errorf("error : Method %s is not Allowed", Method)
 }
 
+func (Instance *Tree)SelectHandler(Node *Node , Method string) http.HandlerFunc{
+	if TypeMethod  , Ok := MethodList[Method]; Ok {
+		if Handler , Ok2 := Node.Handlers[TypeMethod] ; Ok2{
+			return Handler
+		}
+	}
+	return Instance.NotAllowedHandler
+} 
+
+
 func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
 	if Instance.IsWildCard(Path) {
 		if Parent.WildCard {
@@ -85,8 +97,10 @@ func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
 		Parent.WildCard = true
 		Child := NewNode(WildCardType, Path)
 		Child.Param = Path[1:]
-		Parent.Children[Path] = &Child
-		return &Child, nil
+		Child.WildCard = true
+		Parent.Indices = Parent.Indices + string(Path[0])
+		Parent.Children = append(Parent.Children,Child) 
+		return Child, nil
 	}
 	if Instance.IsCatchAll(Path) {
 		if Parent.CatchAll {
@@ -94,12 +108,15 @@ func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
 		}
 		Parent.CatchAll = true
 		Child := NewNode(CatchAllType, Path)
-		Parent.Children[Path] = &Child
-		return &Child, nil
+		Child.CatchAll = true
+		Parent.Indices = Parent.Indices + string(Path[0])
+		Parent.Children= append(Parent.Children, Child)
+		return Child, nil
 	}
 	Child := NewNode(StaticType, Path)
-	Parent.Children[Path] = &Child
-	return &Child, nil
+	Parent.Indices = Parent.Indices + string(Path[0])
+	Parent.Children= append(Parent.Children, Child) 
+	return Child, nil
 }
 
 func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Node, error) {
@@ -108,25 +125,33 @@ func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Nod
 	}
 	Left := Child.Path[:SplitPoint]
 	Right := Child.Path[SplitPoint:]
-	delete(Parent.Children, Child.Path)
-	Child.Path = Right
-	New, Err := Instance.InsertChild(Parent, Left)
-	if Err != nil {
-		return nil, Err
+	//Child.Path = Right
+	NewParent := NewNode(StaticType,Left) // Instance.InsertChild(Parent, Left)
+	for Index , Indice := range []byte(Parent.Indices) {
+		if Indice == Left[0] {
+			NewParent.Children[Index] = NewParent
+		}
 	}
-	New.Children[Right] = Child
-	return New, nil
+	NewChild  , Err := Instance.InsertChild(NewParent,Right)
+	if Err != nil {
+		return nil , Err
+	}
+	NewChild.Indices = Child.Indices
+	NewChild.Children = Child.Children
+	NewChild.Handlers = Child.Handlers
+	
+	return NewParent , nil
 }
 
 func (Instance *Tree) SetHandler(Method string, Path string, Handler http.HandlerFunc) error {
 	if Method == "" || Path == "" || (Handler == nil && Method != CONNECT) {
-		return NewTreeError("Invalid Parameters, Path and Handler are Required", "/")
+		return NewTreeError(Path,"Invalid Parameters, Path and Handler are Required")
 	}
 	Paths := Instance.SplitPath(Path)
 	if len(Paths) == 0 {
-		return Instance.InsertHandler(&Instance.RootNode, Method, Handler)
+		return Instance.InsertHandler(Instance.RootNode, Method, Handler)
 	}
-	return Instance.SetHelper(&Instance.RootNode, Paths, Method, Handler)
+	return Instance.SetHelper(Instance.RootNode, Paths, Method, Handler)
 }
 
 func (Instance *Tree) SetHelper(Parent *Node, Paths []string, Method string, Handler http.HandlerFunc) error {
@@ -149,35 +174,74 @@ func (Instance *Tree) TryMatch(Parent *Node, Paths []string, Method string, Hand
 	}
 	for _, Child := range Parent.Children {
 		Matched, MatchingPoint, LeftPath := Instance.Match(Paths[0], Child.Path)
-		if Matched {
-			return true, Instance.SetHelper(Child, Paths[1:], Method, Handler)
-		}
-		if MatchingPoint > 0 && MatchingPoint < len(Child.Path) {
-			NewParent, Err := Instance.SplitNode(Parent, Child, MatchingPoint)
-			if Err != nil {
-				return true, Err
-			}
-			if len(LeftPath) > 0 {
+		switch {
+			case Matched:
+				return true, Instance.SetHelper(Child, Paths[1:], Method, Handler)
+			case MatchingPoint > 0 && MatchingPoint < len(Child.Path):
+				NewParent, Err := Instance.SplitNode(Parent, Child, MatchingPoint)
+				if Err != nil {
+					return true, Err
+				}
+				if len(LeftPath) > 0 {
+					NewPaths := make([]string, len(Paths))
+					copy(NewPaths, Paths)
+					NewPaths[0] = LeftPath
+					return true, Instance.SetHelper(NewParent, NewPaths, Method, Handler)
+				}
+				return true, Instance.SetHelper(NewParent, Paths[1:], Method, Handler)
+			case MatchingPoint > 0 && MatchingPoint == len(Child.Path) && len(LeftPath) > 0: 
 				NewPaths := make([]string, len(Paths))
 				copy(NewPaths, Paths)
 				NewPaths[0] = LeftPath
-				return true, Instance.SetHelper(NewParent, NewPaths, Method, Handler)
-			}
-			return true, Instance.SetHelper(NewParent, Paths[1:], Method, Handler)
-		}
-		if MatchingPoint > 0 && MatchingPoint == len(Child.Path) && len(LeftPath) > 0 {
-			NewPaths := make([]string, len(Paths))
-			copy(NewPaths, Paths)
-			NewPaths[0] = LeftPath
-			return true, Instance.SetHelper(Child, NewPaths, Method, Handler)
+				return true, Instance.SetHelper(Child, NewPaths, Method, Handler)	
+			
 		}
 	}
 	return false, nil
 }
 
-func (Instance *Tree) GetHandler() {
-
+func (Instance *Tree) GetHandler(Requeset *http.Request) http.HandlerFunc {
+	Path := Requeset.URL.Path
+	Method := Requeset.Method
+	Params := Param.NewParams()
+	Paths := Instance.SplitPath(Path)
+	if len(Paths) == 0 {
+		return Instance.SelectHandler(Instance.RootNode,Method)
+	}
+	return Instance.GetHelper(Instance.RootNode,Method,Paths,Params)
 }
+
+func (Instance *Tree) GetHelper(Node *Node,Method string,Paths []string,Params Param.Params) http.HandlerFunc {
+	if len(Paths) == 0 {
+		return  func(Writer http.ResponseWriter, Request *http.Request) { 
+			Ctx := Request.Context()
+			Ctx = context.WithValue(Ctx,Param.Key{},Params)
+			NewRquest  :=Request.WithContext(Ctx)
+			Instance.SelectHandler(Node,Method)(Writer,NewRquest)
+		} 
+	}
+	for _ , Child := range Node.Children {
+		Matched, MatchingPoint, LeftPath := Instance.Match(Paths[0], Child.Path)
+		switch {
+			case Matched: 
+				return Instance.GetHelper(Child,Method,Paths[1:],Params)
+			case MatchingPoint > 0 && MatchingPoint < len(Child.Path):
+				NewPaths := make([]string,len(Paths))
+				copy(NewPaths,Paths)
+				NewPaths[0] = LeftPath
+				return Instance.GetHelper(Child,Method,NewPaths,Params)
+			case Child.WildCard:
+				Params.Add(Child.Param,Paths[0])
+				return 	Instance.GetHelper(Child,Method,Paths[1:],Params)
+			case Child.CatchAll:
+				Params.Add("CactchAll",strings.Join(Paths,"/"))
+				return Instance.GetHelper(Child,Method,[]string{},Params)
+		}
+	}
+	return Instance.NotFoundHandler
+}
+
+
 
 func (Instance *Tree) ServeHTTP(Writer http.ResponseWriter, Request *http.Request) {
 

@@ -210,7 +210,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 
 		// First wildcard should succeed
-		child1, err1 := tree.InsertChild(&parent, ":id")
+		child1, err1 := tree.InsertChild(parent, ":id")
 		if err1 != nil {
 			t.Errorf("First wildcard insertion failed: %v", err1)
 		}
@@ -219,7 +219,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		}
 
 		// Second wildcard should fail
-		child2, err2 := tree.InsertChild(&parent, ":name")
+		child2, err2 := tree.InsertChild(parent, ":name")
 		if err2 == nil {
 			t.Error("Expected error for duplicate wildcard, got nil")
 		}
@@ -232,7 +232,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 
 		// First catch-all should succeed
-		child1, err1 := tree.InsertChild(&parent, "*files")
+		child1, err1 := tree.InsertChild(parent, "*files")
 		if err1 != nil {
 			t.Errorf("First catch-all insertion failed: %v", err1)
 		}
@@ -241,7 +241,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		}
 
 		// Second catch-all should fail
-		child2, err2 := tree.InsertChild(&parent, "*documents")
+		child2, err2 := tree.InsertChild(parent, "*documents")
 		if err2 == nil {
 			t.Error("Expected error for duplicate catch-all, got nil")
 		}
@@ -267,7 +267,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				newParent := Tree.NewNode(Tree.RootType, "/")
-				child, err := tree.InsertChild(&newParent, test.path)
+				child, err := tree.InsertChild(newParent, test.path)
 
 				if err != nil {
 					t.Errorf("InsertChild(%q) returned error: %v", test.path, err)
@@ -395,9 +395,9 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				parent := Tree.NewNode(Tree.RootType, "/")
 				child := Tree.NewNode(Tree.StaticType, test.originalPath)
-				parent.Children[test.originalPath] = &child
+				parent.Children = append(parent.Children, child)
 
-				newNode, err := tree.SplitNode(&parent, &child, test.splitPoint)
+				newNode, err := tree.SplitNode(parent, child, test.splitPoint)
 
 				if err != nil {
 					t.Errorf("SplitNode failed: %v", err)
@@ -418,10 +418,10 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 	t.Run("split_invalid_point", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
-		parent.Children["users"] = &child
+		parent.Children = append(parent.Children, child)
 
 		// Test split point beyond string length
-		_, err := tree.SplitNode(&parent, &child, 10)
+		_, err := tree.SplitNode(parent, child, 10)
 
 		// The function should handle this gracefully (might panic in current implementation)
 		// This test documents the expected behavior

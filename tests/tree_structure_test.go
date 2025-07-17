@@ -77,42 +77,35 @@ func TestTreeStructureComparison(t *testing.T) {
 						Type:    Tree.StaticType,
 						Methods: []string{},
 						Children: map[string]*TreeStructure{
-							"v": {
-								Path:    "v",
+							"v1": {
+								Path:    "v1",
 								Type:    Tree.StaticType,
 								Methods: []string{},
 								Children: map[string]*TreeStructure{
-									"1": {
-										Path:    "1",
-										Type:    Tree.StaticType,
-										Methods: []string{},
-										Children: map[string]*TreeStructure{
-											"users": {
-												Path:     "users",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET", "POST"},
-												Children: map[string]*TreeStructure{},
-											},
-											"posts": {
-												Path:     "posts",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET"},
-												Children: map[string]*TreeStructure{},
-											},
-										},
+									"users": {
+										Path:     "users",
+										Type:     Tree.StaticType,
+										Methods:  []string{"GET", "POST"},
+										Children: map[string]*TreeStructure{},
 									},
-									"2": {
-										Path:    "2",
-										Type:    Tree.StaticType,
-										Methods: []string{},
-										Children: map[string]*TreeStructure{
-											"users": {
-												Path:     "users",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET"},
-												Children: map[string]*TreeStructure{},
-											},
-										},
+									"posts": {
+										Path:     "posts",
+										Type:     Tree.StaticType,
+										Methods:  []string{"GET"},
+										Children: map[string]*TreeStructure{},
+									},
+								},
+							},
+							"v2": {
+								Path:    "v2",
+								Type:    Tree.StaticType,
+								Methods: []string{},
+								Children: map[string]*TreeStructure{
+									"users": {
+										Path:     "users",
+										Type:     Tree.StaticType,
+										Methods:  []string{"GET"},
+										Children: map[string]*TreeStructure{},
 									},
 								},
 							},
@@ -244,11 +237,9 @@ func TestTreeStructureComparison(t *testing.T) {
 														Methods:  []string{"GET"},
 														Children: map[string]*TreeStructure{},
 													},
-												},
 											},
 										},
 									},
-								},
 							},
 						},
 					},
@@ -268,7 +259,9 @@ func TestTreeStructureComparison(t *testing.T) {
 				},
 			},
 		},
-	}
+	},
+},
+}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -291,13 +284,13 @@ func TestTreeStructureComparison(t *testing.T) {
 			}
 
 			fmt.Println("\nActual tree structure:")
-			printTreeStructure(&tree.RootNode, 0)
+			printTreeStructure(tree.RootNode, 0)
 
 			fmt.Println("\nExpected tree structure:")
 			printExpectedStructure(test.expected, 0)
 
 			// Compare structures
-			actual := buildActualStructure(&tree.RootNode)
+			actual := buildActualStructure(tree.RootNode)
 			if !compareStructures(actual, test.expected) {
 				t.Errorf("Tree structure mismatch for test %s", test.name)
 				fmt.Println("\nDetailed comparison:")
@@ -341,7 +334,7 @@ func TestTreePathTraversal(t *testing.T) {
 	}
 
 	fmt.Println("\nTree structure with all paths:")
-	allPaths := extractAllPaths(&tree.RootNode, "")
+	allPaths := extractAllPaths(tree.RootNode, "")
 	//sort.Strings(allPaths)
 
 	fmt.Println("All possible paths in tree:")
@@ -408,13 +401,17 @@ func printTreeStructure(node *Tree.Node, depth int) {
 
 	// Sort children for consistent output
 	childKeys := make([]string, 0, len(node.Children))
-	for key := range node.Children {
-		childKeys = append(childKeys, key)
+	for _, child := range node.Children {
+		childKeys = append(childKeys, child.Path)
 	}
 	//sort.Strings(childKeys)
 
 	for _, key := range childKeys {
-		printTreeStructure(node.Children[key], depth+1)
+		for _, child := range node.Children {
+			if child.Path == key {
+				printTreeStructure(child, depth+1)
+			}
+		}
 	}
 }
 
@@ -482,8 +479,8 @@ func buildActualStructure(node *Tree.Node) *TreeStructure {
 	sort.Strings(structure.Methods)
 
 	// Build children
-	for key, child := range node.Children {
-		structure.Children[key] = buildActualStructure(child)
+	for _, child := range node.Children {
+		structure.Children[child.Path] = buildActualStructure(child)
 	}
 
 	return structure
@@ -629,7 +626,7 @@ func TestTreeConsistency(t *testing.T) {
 	fmt.Println("\n=== Tree Consistency Test ===")
 
 	// Check tree consistency
-	issues := checkTreeConsistency(&tree.RootNode, "/")
+	issues := checkTreeConsistency(tree.RootNode, "/")
 
 	if len(issues) == 0 {
 		fmt.Println("✓ Tree structure is consistent!")
@@ -680,12 +677,12 @@ func checkTreeConsistency(node *Tree.Node, expectedPath string) []string {
 	}
 
 	// Recursively check children
-	for key, child := range node.Children {
+	for _, child := range node.Children {
 		childPath := expectedPath
 		if expectedPath == "/" {
-			childPath = "/" + key
+			childPath = "/" + child.Path
 		} else {
-			childPath = expectedPath + "/" + key
+			childPath = expectedPath + "/" + child.Path
 		}
 
 		childIssues := checkTreeConsistency(child, childPath)
