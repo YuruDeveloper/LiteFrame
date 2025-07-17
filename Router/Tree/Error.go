@@ -7,9 +7,8 @@ type TreeError struct {
 	Path    string
 }
 
-
 func (Instance *TreeError) Error() string {
-	return fmt.Sprintf("error: %s From %s",Instance.Message,Instance.Path)
+	return fmt.Sprintf("error: %s From %s", Instance.Message, Instance.Path)
 }
 
 func (Instance *TreeError) WithMessage(message string) error {

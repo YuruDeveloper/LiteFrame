@@ -1,34 +1,34 @@
-package Parm
+package Param
 
 import (
 	"context"
 )
 
-type Parm struct {
+type Param struct {
 	Key   string
 	Value string
 }
 
-type Parms struct {
-	List []Parm
+type Params struct {
+	List []Param
 }
 
-type ParmKey struct{}
+type Key struct{}
 
-func (Instance *Parms) Add(Key string,Value string) {
-	Instance.List = append(Instance.List, Parm{Key: Key,Value: Value})
+func (Instance *Params) Add(Key string, Value string) {
+	Instance.List = append(Instance.List, Param{Key: Key, Value: Value})
 }
 
-func (Instance *Parms) GetByName(Name string) string{
-		for _ , Parm := range Instance.List {
-			if Parm.Key == Name {
-				return Parm.Value
-			}
+func (Instance *Params) GetByName(Name string) string {
+	for _, Param := range Instance.List {
+		if Param.Key == Name {
+			return Param.Value
 		}
-		return ""
+	}
+	return ""
 }
 
-func GetParmsFromCTX(Context context.Context) (Parms,bool) {
-	Temp , Susscecs:= (Context.Value(ParmKey{})).(Parms)
-	return Temp , Susscecs
+func GetParamsFromCTX(Context context.Context) (Params, bool) {
+	Temp, Susscecs := (Context.Value(Key{})).(Params)
+	return Temp, Susscecs
 }

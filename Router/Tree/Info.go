@@ -1,11 +1,11 @@
 package Tree
 
-import (
-)
+import ()
 
 type NodeType uint16
 type PriorityLevel uint16
-type MethodType string 
+type MethodType string
+
 const (
 	RootType = iota
 	StaticType
@@ -21,13 +21,19 @@ const (
 )
 
 const (
-	GET = "GET"
-	HEAD = "HEAD"
+	WildCardPrefix = ':'
+	CatchAllPrefix = '*'
+	PathSeparator  = "/"
+)
+
+const (
+	GET     = "GET"
+	HEAD    = "HEAD"
 	OPTIONS = "OPTIONS"
-	TRACE = "TRACE"
-	POST = "POST"
-	PUT = "PUT"
-	DELETE = "DELETE"
-	CONNECT = "CONNEECT"
-	PATCH = "PATCH"
+	TRACE   = "TRACE"
+	POST    = "POST"
+	PUT     = "PUT"
+	DELETE  = "DELETE"
+	CONNECT = "CONNECT"
+	PATCH   = "PATCH"
 )

@@ -8,4 +8,4 @@ type Middleware interface {
 	GetHandler() MiddleWareFunc
 }
 
-type MiddleWareFunc func(http.Handler) (http.Handler)
+type MiddleWareFunc func(http.Handler) http.Handler

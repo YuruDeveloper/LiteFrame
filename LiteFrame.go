@@ -1,4 +1,4 @@
-package liteframe
+package LiteFrame
 
 // Hello returns a greeting from LiteFrame.
 func Hello() string {
