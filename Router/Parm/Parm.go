@@ -9,12 +9,18 @@ type Parm struct {
 	Value string
 }
 
-type Parms []Parm
+type Parms struct {
+	List []Parm
+}
 
 type ParmKey struct{}
 
+func (Instance *Parms) Add(Key string,Value string) {
+	Instance.List = append(Instance.List, Parm{Key: Key,Value: Value})
+}
+
 func (Instance *Parms) GetByName(Name string) string{
-		for _ , Parm := range *Instance {
+		for _ , Parm := range Instance.List {
 			if Parm.Key == Name {
 				return Parm.Value
 			}
