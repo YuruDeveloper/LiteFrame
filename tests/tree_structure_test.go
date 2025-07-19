@@ -3,11 +3,44 @@ package tests
 import (
 	"LiteFrame/Router/Tree"
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 )
+
+// Test helper function to create a simple handler
+func createTestHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func  MethodTypeToString(Method Tree.MethodType) string {
+	switch (Method) {
+		case Tree.GET:
+			return "GET"
+		case Tree.HEAD:
+			return "HEAD"
+		case Tree.OPTIONS:
+			return "OPTIONS"
+		case Tree.TRACE:
+			return "TRACE"
+		case Tree.POST:
+			return "POST"
+		case Tree.PUT:
+			return "PUT"
+		case Tree.DELETE:
+			return "DELETE"
+		case Tree.CONNECT:
+			return "CONNECT"
+		case Tree.PATCH:
+			return "PATCH"
+		default:
+			return "NOTALLOWED"
+	}
+}
 
 // TreeStructure represents expected tree structure for testing
 type TreeStructure struct {
@@ -77,35 +110,42 @@ func TestTreeStructureComparison(t *testing.T) {
 						Type:    Tree.StaticType,
 						Methods: []string{},
 						Children: map[string]*TreeStructure{
-							"v1": {
-								Path:    "v1",
+							"v": {
+								Path:    "v",
 								Type:    Tree.StaticType,
 								Methods: []string{},
 								Children: map[string]*TreeStructure{
-									"users": {
-										Path:     "users",
-										Type:     Tree.StaticType,
-										Methods:  []string{"GET", "POST"},
-										Children: map[string]*TreeStructure{},
+									"1": {
+										Path:    "1",
+										Type:    Tree.StaticType,
+										Methods: []string{},
+										Children: map[string]*TreeStructure{
+											"users": {
+												Path:     "users",
+												Type:     Tree.StaticType,
+												Methods:  []string{"GET", "POST"},
+												Children: map[string]*TreeStructure{},
+											},
+											"posts": {
+												Path:     "posts",
+												Type:     Tree.StaticType,
+												Methods:  []string{"GET"},
+												Children: map[string]*TreeStructure{},
+											},
+										},
 									},
-									"posts": {
-										Path:     "posts",
-										Type:     Tree.StaticType,
-										Methods:  []string{"GET"},
-										Children: map[string]*TreeStructure{},
-									},
-								},
-							},
-							"v2": {
-								Path:    "v2",
-								Type:    Tree.StaticType,
-								Methods: []string{},
-								Children: map[string]*TreeStructure{
-									"users": {
-										Path:     "users",
-										Type:     Tree.StaticType,
-										Methods:  []string{"GET"},
-										Children: map[string]*TreeStructure{},
+									"2": {
+										Path:    "2",
+										Type:    Tree.StaticType,
+										Methods: []string{},
+										Children: map[string]*TreeStructure{
+											"users": {
+												Path:     "users",
+												Type:     Tree.StaticType,
+												Methods:  []string{"GET"},
+												Children: map[string]*TreeStructure{},
+											},
+										},
 									},
 								},
 							},
@@ -171,6 +211,7 @@ func TestTreeStructureComparison(t *testing.T) {
 								Path:     "*path",
 								Type:     Tree.CatchAllType,
 								Methods:  []string{"GET"},
+								Param:    "path",
 								Children: map[string]*TreeStructure{},
 							},
 						},
@@ -184,6 +225,7 @@ func TestTreeStructureComparison(t *testing.T) {
 								Path:     "*filepath",
 								Type:     Tree.CatchAllType,
 								Methods:  []string{"GET"},
+								Param:    "filepath",
 								Children: map[string]*TreeStructure{},
 							},
 						},
@@ -237,9 +279,11 @@ func TestTreeStructureComparison(t *testing.T) {
 														Methods:  []string{"GET"},
 														Children: map[string]*TreeStructure{},
 													},
+												},
 											},
 										},
 									},
+								},
 							},
 						},
 					},
@@ -252,6 +296,7 @@ func TestTreeStructureComparison(t *testing.T) {
 								Path:     "*files",
 								Type:     Tree.CatchAllType,
 								Methods:  []string{"GET"},
+								Param:    "files",
 								Children: map[string]*TreeStructure{},
 							},
 						},
@@ -259,9 +304,7 @@ func TestTreeStructureComparison(t *testing.T) {
 				},
 			},
 		},
-	},
-},
-}
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -382,7 +425,7 @@ func printTreeStructure(node *Tree.Node, depth int) {
 	methods := []string{}
 	for method, handler := range node.Handlers {
 		if handler != nil {
-			methods = append(methods, string(method))
+			methods = append(methods, MethodTypeToString(Tree.MethodType(method)))
 		}
 	}
 	//sort.Strings(methods)
@@ -412,6 +455,16 @@ func printTreeStructure(node *Tree.Node, depth int) {
 				printTreeStructure(child, depth+1)
 			}
 		}
+	}
+
+	// Print wildcard child
+	if node.WildCard != nil {
+		printTreeStructure(node.WildCard, depth+1)
+	}
+
+	// Print catch-all child
+	if node.CatchAll != nil {
+		printTreeStructure(node.CatchAll, depth+1)
 	}
 }
 
@@ -473,7 +526,7 @@ func buildActualStructure(node *Tree.Node) *TreeStructure {
 	// Collect methods
 	for method, handler := range node.Handlers {
 		if handler != nil {
-			structure.Methods = append(structure.Methods, string(method))
+			structure.Methods = append(structure.Methods, MethodTypeToString(Tree.MethodType(method)))
 		}
 	}
 	sort.Strings(structure.Methods)
@@ -481,6 +534,16 @@ func buildActualStructure(node *Tree.Node) *TreeStructure {
 	// Build children
 	for _, child := range node.Children {
 		structure.Children[child.Path] = buildActualStructure(child)
+	}
+
+	// Build wildcard child
+	if node.WildCard != nil {
+		structure.Children[node.WildCard.Path] = buildActualStructure(node.WildCard)
+	}
+
+	// Build catch-all child
+	if node.CatchAll != nil {
+		structure.Children[node.CatchAll.Path] = buildActualStructure(node.CatchAll)
 	}
 
 	return structure
@@ -589,13 +652,25 @@ func extractAllPaths(node *Tree.Node, currentPath string) []string {
 		}
 	}
 
-	if hasHandlers || node.Type == Tree.RootType || len(node.Children) > 0 {
+	if hasHandlers || node.Type == Tree.RootType || len(node.Children) > 0 || node.WildCard != nil || node.CatchAll != nil {
 		paths = append(paths, fullPath)
 	}
 
 	// Recursively get paths from children
 	for _, child := range node.Children {
 		childPaths := extractAllPaths(child, fullPath)
+		paths = append(paths, childPaths...)
+	}
+
+	// Recursively get paths from wildcard child
+	if node.WildCard != nil {
+		childPaths := extractAllPaths(node.WildCard, fullPath)
+		paths = append(paths, childPaths...)
+	}
+
+	// Recursively get paths from catch-all child
+	if node.CatchAll != nil {
+		childPaths := extractAllPaths(node.CatchAll, fullPath)
 		paths = append(paths, childPaths...)
 	}
 
@@ -668,13 +743,16 @@ func checkTreeConsistency(node *Tree.Node, expectedPath string) []string {
 		issues = append(issues, fmt.Sprintf("Node at %s has multiple catch-all children", expectedPath))
 	}
 
-	if node.WildCard && wildcardCount == 0 {
-		issues = append(issues, fmt.Sprintf("Node at %s has WildCard flag but no wildcard children", expectedPath))
-	}
+    // 4) 와일드카드 노드 검사: 자식이 있을 때만 "없음" 에러
+    if node.WildCard != nil && wildcardCount == 0 && len(node.Children) > 0 {
+        issues = append(issues, fmt.Sprintf("Node at %s has WildCard but no wildcard children", expectedPath))
+    }
 
-	if node.CatchAll && catchAllCount == 0 {
-		issues = append(issues, fmt.Sprintf("Node at %s has CatchAll flag but no catch-all children", expectedPath))
-	}
+    // 5) 캐치올 노드 검사: 자식이 있으면 에러
+    if node.CatchAll != nil && catchAllCount == 0 && len(node.Children) > 0 {
+        // (원래는 자식이 없어야 하므로, 자식이 있다는 것 자체가 문제)
+        issues = append(issues, fmt.Sprintf("Node at %s has CatchAll but should not have children", expectedPath))
+    }
 
 	// Recursively check children
 	for _, child := range node.Children {
@@ -686,6 +764,32 @@ func checkTreeConsistency(node *Tree.Node, expectedPath string) []string {
 		}
 
 		childIssues := checkTreeConsistency(child, childPath)
+		issues = append(issues, childIssues...)
+	}
+
+	// Check wildcard child
+	if node.WildCard != nil {
+		childPath := expectedPath
+		if expectedPath == "/" {
+			childPath = "/" + node.WildCard.Path
+		} else {
+			childPath = expectedPath + "/" + node.WildCard.Path
+		}
+
+		childIssues := checkTreeConsistency(node.WildCard, childPath)
+		issues = append(issues, childIssues...)
+	}
+
+	// Check catch-all child
+	if node.CatchAll != nil {
+		childPath := expectedPath
+		if expectedPath == "/" {
+			childPath = "/" + node.CatchAll.Path
+		} else {
+			childPath = expectedPath + "/" + node.CatchAll.Path
+		}
+
+		childIssues := checkTreeConsistency(node.CatchAll, childPath)
 		issues = append(issues, childIssues...)
 	}
 

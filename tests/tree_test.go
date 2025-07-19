@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// Test helper function to create a simple handler
-func createTestHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}
-}
 
 // TestNewTree tests the Tree constructor
 func TestNewTree(t *testing.T) {
@@ -176,13 +170,10 @@ func TestInsertHandler(t *testing.T) {
 	for _, method := range validMethods {
 		t.Run("valid_method_"+method, func(t *testing.T) {
 			node := Tree.NewNode(Tree.StaticType, "/test")
-			err := tree.InsertHandler(node, method, handler)
+			methodType := tree.StringToMethodType(method)
+			tree.InsertHandler(node, methodType, handler)
 
-			if err != nil {
-				t.Errorf("InsertHandler() with method %s returned error: %v", method, err)
-			}
-
-			if node.Handlers[Tree.MethodList[method]] == nil {
+			if node.Handlers[methodType] == nil {
 				t.Errorf("Handler for method %s was not set", method)
 			}
 		})
@@ -190,11 +181,10 @@ func TestInsertHandler(t *testing.T) {
 
 	// Test invalid method
 	t.Run("invalid_method", func(t *testing.T) {
-		node := Tree.NewNode(Tree.StaticType, "/test")
-		err := tree.InsertHandler(node, "INVALID", handler)
-
-		if err == nil {
-			t.Error("Expected error for invalid method, got nil")
+		methodType := tree.StringToMethodType("INVALID")
+		
+		if methodType != Tree.NotAllowed {
+			t.Error("Expected NotAllowed method type for invalid method")
 		}
 	})
 }
@@ -244,8 +234,8 @@ func TestInsertChild(t *testing.T) {
 			t.Errorf("Expected param 'id', got '%s'", child.Param)
 		}
 
-		if !parent.WildCard {
-			t.Error("Expected parent WildCard flag to be true")
+		if parent.WildCard == nil {
+			t.Error("Expected parent WildCard to be set")
 		}
 	})
 
@@ -265,14 +255,14 @@ func TestInsertChild(t *testing.T) {
 			t.Errorf("Expected catch-all type %d, got %d", Tree.CatchAllType, child.Type)
 		}
 
-		if !parent.CatchAll {
-			t.Error("Expected parent CatchAll flag to be true")
+		if parent.CatchAll == nil {
+			t.Error("Expected parent CatchAll to be set")
 		}
 	})
 
 	t.Run("duplicate_wildcard_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		parent.WildCard = true
+		parent.WildCard = Tree.NewNode(Tree.WildCardType, ":existing")
 
 		_, err := tree.InsertChild(parent, ":id")
 
@@ -283,7 +273,7 @@ func TestInsertChild(t *testing.T) {
 
 	t.Run("duplicate_catch_all_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		parent.CatchAll = true
+		parent.CatchAll = Tree.NewNode(Tree.CatchAllType, "*existing")
 
 		_, err := tree.InsertChild(parent, "*files")
 
@@ -416,7 +406,7 @@ func TestTryMatch(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		paths := []string{"users"}
 
-		matched, err := tree.TryMatch(parent, paths, "GET", handler)
+		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
 
 		if err != nil {
 			t.Errorf("TryMatch() returned error: %v", err)
@@ -433,7 +423,7 @@ func TestTryMatch(t *testing.T) {
 		parent.Children = append(parent.Children, child)
 		paths := []string{"users", "123"}
 
-		matched, err := tree.TryMatch(parent, paths, "GET", handler)
+		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
 
 		if err != nil {
 			t.Errorf("TryMatch() returned error: %v", err)

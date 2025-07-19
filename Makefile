@@ -14,6 +14,7 @@ help:
 	@echo "  make lint       - 코드 린팅"
 	@echo "  make fmt        - 코드 포맷팅"
 	@echo "  make build      - 프로젝트 빌드"
+	@echo "  make benchmark  - 벤치마크 테스트 실행"
 	@echo "  make clean      - 테스트 캐시 정리"
 	@echo "  make run        - 프로젝트 실행"
 
@@ -68,7 +69,11 @@ clean:
 # 벤치마크 테스트
 benchmark:
 	@echo "벤치마크 테스트 실행 중..."
-	@cd tests && go test -bench=. -benchmem
+	@cd bench && go test -bench=. -benchmem
+
+pprof-gethandler:
+	@echo "pprof 실행 중..."
+	@cd bench && go test -bench=BenchmarkGetHandler  -run=^$ -benchmem -cpuprofile=CPU.prof && go tool pprof bench.test CPU.prof
 
 # 테스트 커버리지
 coverage:
