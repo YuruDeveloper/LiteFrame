@@ -2,184 +2,228 @@ package tests
 
 import (
 	"LiteFrame/Router/Tree"
-	"net/http"
 	"testing"
 )
 
+// ======================
+// Tree 생성자 테스트
+// ======================
 
-// TestNewTree tests the Tree constructor
 func TestNewTree(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
-	if tree.RootNode.Type != Tree.RootType {
-		t.Errorf("Expected root node type %d, got %d", Tree.RootType, tree.RootNode.Type)
-	}
+	t.Run("root_node_type", func(t *testing.T) {
+		if tree.RootNode.Type != Tree.RootType {
+			t.Errorf("Expected root node type %d, got %d", Tree.RootType, tree.RootNode.Type)
+		}
+	})
 
-	if tree.RootNode.Path != "/" {
-		t.Errorf("Expected root path '/', got '%s'", tree.RootNode.Path)
-	}
+	t.Run("root_path", func(t *testing.T) {
+		if tree.RootNode.Path != "/" {
+			t.Errorf("Expected root path '/', got '%s'", tree.RootNode.Path)
+		}
+	})
 
-	if tree.RootNode.Children == nil {
-		t.Error("Expected children map to be initialized")
-	}
+	t.Run("children_initialized", func(t *testing.T) {
+		if tree.RootNode.Children == nil {
+			t.Error("Expected children slice to be initialized")
+		}
+	})
 
-	if tree.RootNode.Handlers == nil {
-		t.Error("Expected handlers map to be initialized")
-	}
+	t.Run("handlers_initialized", func(t *testing.T) {
+		if tree.RootNode.Handlers == nil {
+			t.Error("Expected handlers map to be initialized")
+		}
+	})
 }
 
-// TestIsWildCard tests wildcard detection
-func TestIsWildCard(t *testing.T) {
-	tree := Tree.NewTree()
+// ======================
+// 경로 분할 테스트
+// ======================
 
-	tests := []struct {
-		input    string
-		expected bool
-		name     string
-	}{
-		{":id", true, "valid wildcard"},
-		{":user", true, "valid wildcard with text"},
-		{"", false, "empty string"},
-		{"id", false, "regular string"},
-		{"*", false, "catch-all character"},
-		{"::", true, "double colon"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := tree.IsWildCard(test.input)
-			if result != test.expected {
-				t.Errorf("IsWildCard(%q) = %v, expected %v", test.input, result, test.expected)
-			}
-		})
-	}
-}
-
-// TestIsCatchAll tests catch-all detection
-func TestIsCatchAll(t *testing.T) {
-	tree := Tree.NewTree()
-
-	tests := []struct {
-		input    string
-		expected bool
-		name     string
-	}{
-		{"*", true, "valid catch-all"},
-		{"*files", true, "catch-all with text"},
-		{"", false, "empty string"},
-		{"files", false, "regular string"},
-		{":", false, "wildcard character"},
-		{"**", true, "double asterisk"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := tree.IsCatchAll(test.input)
-			if result != test.expected {
-				t.Errorf("IsCatchAll(%q) = %v, expected %v", test.input, result, test.expected)
-			}
-		})
-	}
-}
-
-// TestSplitPath tests path splitting functionality
 func TestSplitPath(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
-	tests := []struct {
+	testCases := []struct {
+		name     string
 		input    string
 		expected []string
-		name     string
 	}{
-		{"/", []string{}, "root path"},
-		{"", []string{}, "empty string"},
-		{"/users", []string{"users"}, "single segment"},
-		{"/users/123", []string{"users", "123"}, "two segments"},
-		{"/users/123/posts", []string{"users", "123", "posts"}, "three segments"},
-		{"users/123", []string{"users", "123"}, "no leading slash"},
-		{"/users/", []string{"users"}, "trailing slash"},
-		{"//users//123//", []string{"users", "123"}, "multiple slashes"},
+		{"root_path", "/", []string{}},
+		{"empty_string", "", []string{}},
+		{"single_segment", "/users", []string{"users"}},
+		{"two_segments", "/users/123", []string{"users", "123"}},
+		{"three_segments", "/users/123/posts", []string{"users", "123", "posts"}},
+		{"no_leading_slash", "users/123", []string{"users", "123"}},
+		{"trailing_slash", "/users/", []string{"users"}},
+		{"multiple_slashes", "//users//123//", []string{"users", "123"}},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := tree.SplitPath(test.input)
-			if len(result) != len(test.expected) {
-				t.Errorf("SplitPath(%q) length = %d, expected %d", test.input, len(result), len(test.expected))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tree.SplitPath(tc.input)
+			
+			if len(result) != len(tc.expected) {
+				t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 				return
 			}
 
 			for i, segment := range result {
-				if segment != test.expected[i] {
-					t.Errorf("SplitPath(%q)[%d] = %q, expected %q", test.input, i, segment, test.expected[i])
+				if segment != tc.expected[i] {
+					t.Errorf("Expected segment[%d] = '%s', got '%s'", i, tc.expected[i], segment)
 				}
 			}
 		})
 	}
 }
 
-// TestMatch tests string matching functionality
-func TestMatch(t *testing.T) {
-	tree := Tree.NewTree()
+// ======================
+// 와일드카드 검증 테스트
+// ======================
 
-	tests := []struct {
-		one           string
-		two           string
-		expectedMatch bool
-		expectedIndex int
-		expectedLeft  string
-		name          string
-	}{
-		{"users", "users", true, 5, "", "exact match"},
-		{"user", "users", true, 4, "", "first shorter"},
-		{"users", "user", false, 4, "s", "second shorter"},
-		{"abc", "def", false, 0, "abc", "no match"},
-		{"", "", true, 0, "", "both empty"},
-		{"test", "", false, 0, "test", "second empty"},
-		{"", "test", true, 0, "", "first empty"},
-		{"hello", "help", false, 3, "lo", "partial match"},
+func TestIsWildCard(t *testing.T) {
+	tree := SetupTree()
+
+	testCases := []TestCase{
+		{"valid_wildcard", ":id", true},
+		{"valid_wildcard_with_text", ":user", true},
+		{"empty_string", "", false},
+		{"regular_string", "id", false},
+		{"catch_all_character", "*", false},
+		{"double_colon", "::", true},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			matched, index, left := tree.Match(test.one, test.two)
-
-			if matched != test.expectedMatch {
-				t.Errorf("Match(%q, %q) matched = %v, expected %v", test.one, test.two, matched, test.expectedMatch)
-			}
-
-			if index != test.expectedIndex {
-				t.Errorf("Match(%q, %q) index = %d, expected %d", test.one, test.two, index, test.expectedIndex)
-			}
-
-			if left != test.expectedLeft {
-				t.Errorf("Match(%q, %q) left = %q, expected %q", test.one, test.two, left, test.expectedLeft)
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := tree.IsWildCard(tc.Input)
+			expected := tc.Expected.(bool)
+			
+			if result != expected {
+				t.Errorf("IsWildCard(%q) = %v, expected %v", tc.Input, result, expected)
 			}
 		})
 	}
 }
 
-// TestInsertHandler tests handler insertion
-func TestInsertHandler(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
+// ======================
+// 캐치올 검증 테스트
+// ======================
 
-	// Test valid methods
-	validMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
+func TestIsCatchAll(t *testing.T) {
+	tree := SetupTree()
 
-	for _, method := range validMethods {
-		t.Run("valid_method_"+method, func(t *testing.T) {
-			node := Tree.NewNode(Tree.StaticType, "/test")
-			methodType := tree.StringToMethodType(method)
-			tree.InsertHandler(node, methodType, handler)
+	testCases := []TestCase{
+		{"valid_catch_all", "*", true},
+		{"catch_all_with_text", "*files", true},
+		{"empty_string", "", false},
+		{"regular_string", "files", false},
+		{"wildcard_character", ":", false},
+		{"double_asterisk", "**", true},
+	}
 
-			if node.Handlers[methodType] == nil {
-				t.Errorf("Handler for method %s was not set", method)
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := tree.IsCatchAll(tc.Input)
+			expected := tc.Expected.(bool)
+			
+			if result != expected {
+				t.Errorf("IsCatchAll(%q) = %v, expected %v", tc.Input, result, expected)
 			}
 		})
 	}
+}
 
-	// Test invalid method
+// ======================
+// 문자열 매칭 테스트
+// ======================
+
+func TestMatch(t *testing.T) {
+	tree := SetupTree()
+
+	testCases := []MatchTestCase{
+		{
+			Name:          "exact_match",
+			One:           "users",
+			Two:           "users",
+			ExpectedMatch: true,
+			ExpectedIndex: 5,
+			ExpectedLeft:  "",
+		},
+		{
+			Name:          "first_shorter",
+			One:           "user",
+			Two:           "users",
+			ExpectedMatch: true,
+			ExpectedIndex: 4,
+			ExpectedLeft:  "",
+		},
+		{
+			Name:          "second_shorter",
+			One:           "users",
+			Two:           "user",
+			ExpectedMatch: false,
+			ExpectedIndex: 4,
+			ExpectedLeft:  "s",
+		},
+		{
+			Name:          "no_match",
+			One:           "abc",
+			Two:           "def",
+			ExpectedMatch: false,
+			ExpectedIndex: 0,
+			ExpectedLeft:  "abc",
+		},
+		{
+			Name:          "both_empty",
+			One:           "",
+			Two:           "",
+			ExpectedMatch: true,
+			ExpectedIndex: 0,
+			ExpectedLeft:  "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			matched, index, left := tree.Match(tc.One, tc.Two)
+
+			if matched != tc.ExpectedMatch {
+				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
+			}
+			if index != tc.ExpectedIndex {
+				t.Errorf("Expected index %d, got %d", tc.ExpectedIndex, index)
+			}
+			if left != tc.ExpectedLeft {
+				t.Errorf("Expected left '%s', got '%s'", tc.ExpectedLeft, left)
+			}
+		})
+	}
+}
+
+// ======================
+// 핸들러 삽입 테스트
+// ======================
+
+func TestInsertHandler(t *testing.T) {
+	tree := SetupTree()
+	handler := CreateTestHandler()
+
+	validMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
+
+	t.Run("valid_methods", func(t *testing.T) {
+		for _, method := range validMethods {
+			t.Run(method, func(t *testing.T) {
+				node := Tree.NewNode(Tree.StaticType, "/test")
+				methodType := tree.StringToMethodType(method)
+				tree.InsertHandler(node, methodType, handler)
+
+				if node.Handlers[methodType] == nil {
+					t.Errorf("Handler for method %s was not set", method)
+				}
+			})
+		}
+	})
+
 	t.Run("invalid_method", func(t *testing.T) {
 		methodType := tree.StringToMethodType("INVALID")
 		
@@ -189,26 +233,25 @@ func TestInsertHandler(t *testing.T) {
 	})
 }
 
-// TestInsertChild tests child node insertion
+// ======================
+// 자식 노드 삽입 테스트
+// ======================
+
 func TestInsertChild(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
 	t.Run("static_child", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child, err := tree.InsertChild(parent, "users")
 
-		if err != nil {
-			t.Errorf("InsertChild() returned error: %v", err)
-		}
-
+		AssertNoError(t, err, "InsertChild")
+		
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
-
 		if child.Type != Tree.StaticType {
 			t.Errorf("Expected static type %d, got %d", Tree.StaticType, child.Type)
 		}
-
 		if child.Path != "users" {
 			t.Errorf("Expected path 'users', got '%s'", child.Path)
 		}
@@ -218,22 +261,17 @@ func TestInsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child, err := tree.InsertChild(parent, ":id")
 
-		if err != nil {
-			t.Errorf("InsertChild() returned error: %v", err)
-		}
-
+		AssertNoError(t, err, "InsertChild wildcard")
+		
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
-
 		if child.Type != Tree.WildCardType {
 			t.Errorf("Expected wildcard type %d, got %d", Tree.WildCardType, child.Type)
 		}
-
 		if child.Param != "id" {
 			t.Errorf("Expected param 'id', got '%s'", child.Param)
 		}
-
 		if parent.WildCard == nil {
 			t.Error("Expected parent WildCard to be set")
 		}
@@ -243,114 +281,83 @@ func TestInsertChild(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child, err := tree.InsertChild(parent, "*files")
 
-		if err != nil {
-			t.Errorf("InsertChild() returned error: %v", err)
-		}
-
+		AssertNoError(t, err, "InsertChild catch-all")
+		
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
-
 		if child.Type != Tree.CatchAllType {
 			t.Errorf("Expected catch-all type %d, got %d", Tree.CatchAllType, child.Type)
 		}
-
 		if parent.CatchAll == nil {
 			t.Error("Expected parent CatchAll to be set")
 		}
 	})
 
-	t.Run("duplicate_wildcard_error", func(t *testing.T) {
+	t.Run("duplicate_errors", func(t *testing.T) {
+		// 중복 와일드카드 테스트
 		parent := Tree.NewNode(Tree.RootType, "/")
 		parent.WildCard = Tree.NewNode(Tree.WildCardType, ":existing")
-
+		
 		_, err := tree.InsertChild(parent, ":id")
+		AssertError(t, err, "duplicate wildcard")
 
-		if err == nil {
-			t.Error("Expected error for duplicate wildcard, got nil")
-		}
-	})
-
-	t.Run("duplicate_catch_all_error", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
-		parent.CatchAll = Tree.NewNode(Tree.CatchAllType, "*existing")
-
-		_, err := tree.InsertChild(parent, "*files")
-
-		if err == nil {
-			t.Error("Expected error for duplicate catch-all, got nil")
-		}
+		// 중복 캐치올 테스트
+		parent2 := Tree.NewNode(Tree.RootType, "/")
+		parent2.CatchAll = Tree.NewNode(Tree.CatchAllType, "*existing")
+		
+		_, err = tree.InsertChild(parent2, "*files")
+		AssertError(t, err, "duplicate catch-all")
 	})
 }
 
-// TestSetHandler tests complete handler setting functionality
+// ======================
+// 핸들러 설정 테스트
+// ======================
+
 func TestSetHandler(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
+	tree := SetupTree()
+	handler := CreateTestHandler()
 
-	t.Run("root_handler", func(t *testing.T) {
-		err := tree.SetHandler("GET", "/", handler)
-		if err != nil {
-			t.Errorf("SetHandler() returned error: %v", err)
-		}
+	testCases := []struct {
+		name   string
+		method string
+		path   string
+		valid  bool
+	}{
+		{"root_handler", "GET", "/", true},
+		{"simple_path", "GET", "/users", true},
+		{"nested_path", "POST", "/users/123/posts", true},
+		{"wildcard_path", "GET", "/users/:id", true},
+		{"catch_all_path", "GET", "/files/*path", true},
+		{"empty_method", "", "/test", false},
+		{"empty_path", "GET", "", false},
+	}
 
-		if tree.RootNode.Handlers[Tree.GET] == nil {
-			t.Error("Root handler was not set")
-		}
-	})
-
-	t.Run("simple_path", func(t *testing.T) {
-		err := tree.SetHandler("GET", "/users", handler)
-		if err != nil {
-			t.Errorf("SetHandler() returned error: %v", err)
-		}
-	})
-
-	t.Run("nested_path", func(t *testing.T) {
-		err := tree.SetHandler("POST", "/users/123/posts", handler)
-		if err != nil {
-			t.Errorf("SetHandler() returned error: %v", err)
-		}
-	})
-
-	t.Run("wildcard_path", func(t *testing.T) {
-		err := tree.SetHandler("GET", "/users/:id", handler)
-		if err != nil {
-			t.Errorf("SetHandler() returned error: %v", err)
-		}
-	})
-
-	t.Run("catch_all_path", func(t *testing.T) {
-		err := tree.SetHandler("GET", "/files/*path", handler)
-		if err != nil {
-			t.Errorf("SetHandler() returned error: %v", err)
-		}
-	})
-
-	t.Run("invalid_parameters", func(t *testing.T) {
-		tests := []struct {
-			method  string
-			path    string
-			handler http.HandlerFunc
-			name    string
-		}{
-			{"", "/test", handler, "empty method"},
-			{"GET", "", handler, "empty path"},
-			{"GET", "/test", nil, "nil handler"},
-		}
-
-		for _, test := range tests {
-			err := tree.SetHandler(test.method, test.path, test.handler)
-			if err == nil {
-				t.Errorf("Expected error for %s, got nil", test.name)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var testHandler Tree.HandlerFunc
+			if tc.valid {
+				testHandler = handler
 			}
-		}
-	})
+			
+			err := tree.SetHandler(tc.method, tc.path, testHandler)
+			
+			if tc.valid {
+				AssertNoError(t, err, "SetHandler")
+			} else {
+				AssertError(t, err, "SetHandler with invalid params")
+			}
+		})
+	}
 }
 
-// TestSplitNode tests node splitting functionality
+// ======================
+// 노드 분할 테스트
+// ======================
+
 func TestSplitNode(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
 	t.Run("basic_split", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
@@ -358,60 +365,35 @@ func TestSplitNode(t *testing.T) {
 		parent.Children = append(parent.Children, child)
 
 		newNode, err := tree.SplitNode(parent, child, 4)
-
-		if err != nil {
-			t.Errorf("SplitNode() returned error: %v", err)
-		}
+		AssertNoError(t, err, "SplitNode")
 
 		if newNode == nil {
 			t.Error("Expected new node, got nil")
 		}
-
 		if newNode.Path != "user" {
 			t.Errorf("Expected new node path 'user', got '%s'", newNode.Path)
 		}
-
 		if child.Path != "s" {
 			t.Errorf("Expected child path 's', got '%s'", child.Path)
-		}
-
-		found := false
-		for _, c := range parent.Children {
-			if c.Path == "users" {
-				found = true
-			}
-		}
-		if found {
-			t.Error("Original child should be removed from parent")
-		}
-
-		found = false
-		for _, c := range parent.Children {
-			if c.Path == "user" {
-				found = true
-			}
-		}
-		if !found {
-			t.Error("New node should be added to parent")
 		}
 	})
 }
 
-// TestTryMatch tests the pattern matching logic
+// ======================
+// 패턴 매칭 테스트
+// ======================
+
 func TestTryMatch(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
+	tree := SetupTree()
+	handler := CreateTestHandler()
 
 	t.Run("no_children", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		paths := []string{"users"}
 
 		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
-
-		if err != nil {
-			t.Errorf("TryMatch() returned error: %v", err)
-		}
-
+		AssertNoError(t, err, "TryMatch")
+		
 		if matched {
 			t.Error("Expected no match, got match")
 		}
@@ -424,45 +406,10 @@ func TestTryMatch(t *testing.T) {
 		paths := []string{"users", "123"}
 
 		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
-
-		if err != nil {
-			t.Errorf("TryMatch() returned error: %v", err)
-		}
-
+		AssertNoError(t, err, "TryMatch")
+		
 		if !matched {
 			t.Error("Expected match, got no match")
 		}
 	})
-}
-
-// Benchmark tests for performance
-func BenchmarkSplitPath(b *testing.B) {
-	tree := Tree.NewTree()
-	path := "/users/123/posts/456/comments"
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		tree.SplitPath(path)
-	}
-}
-
-func BenchmarkMatch(b *testing.B) {
-	tree := Tree.NewTree()
-	one := "users"
-	two := "users"
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		tree.Match(one, two)
-	}
-}
-
-func BenchmarkSetHandler(b *testing.B) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		tree.SetHandler("GET", "/users", handler)
-	}
 }

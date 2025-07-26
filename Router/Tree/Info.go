@@ -2,7 +2,13 @@
 // 노드 타입, HTTP 메서드, 우선순위 등에 대한 열거형과 상수를 정의합니다.
 package Tree
 
-import ()
+import (
+	"LiteFrame/Router/Param"
+	"net/http"
+)
+
+
+type HandlerFunc func (http.ResponseWriter,*http.Request,*Param.Params)
 
 // NodeType은 트리 노드의 타입을 나타내는 열거형입니다.
 type NodeType uint32

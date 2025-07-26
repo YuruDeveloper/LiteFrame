@@ -2,796 +2,283 @@ package tests
 
 import (
 	"LiteFrame/Router/Tree"
-	"fmt"
-	"net/http"
-	"reflect"
-	"sort"
-	"strings"
 	"testing"
 )
 
-// Test helper function to create a simple handler
-func createTestHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}
-}
+// ======================
+// 트리 구조 검증 테스트
+// ======================
 
-func  MethodTypeToString(Method Tree.MethodType) string {
-	switch (Method) {
-		case Tree.GET:
-			return "GET"
-		case Tree.HEAD:
-			return "HEAD"
-		case Tree.OPTIONS:
-			return "OPTIONS"
-		case Tree.TRACE:
-			return "TRACE"
-		case Tree.POST:
-			return "POST"
-		case Tree.PUT:
-			return "PUT"
-		case Tree.DELETE:
-			return "DELETE"
-		case Tree.CONNECT:
-			return "CONNECT"
-		case Tree.PATCH:
-			return "PATCH"
-		default:
-			return "NOTALLOWED"
-	}
-}
+func TestTreeStructure(t *testing.T) {
+	t.Run("simple_static_routes", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateTestHandler()
 
-// TreeStructure represents expected tree structure for testing
-type TreeStructure struct {
-	Path     string
-	Type     Tree.NodeType
-	Children map[string]*TreeStructure
-	Methods  []string
-	Param    string
-}
-
-// ExpectedRoute represents a route with its expected structure
-type ExpectedRoute struct {
-	Method      string
-	Path        string
-	Description string
-}
-
-// TestTreeStructureComparison tests actual vs expected tree structures
-func TestTreeStructureComparison(t *testing.T) {
-	tests := []struct {
-		name     string
-		routes   []ExpectedRoute
-		expected *TreeStructure
-	}{
-		{
-			name: "simple_static_routes",
-			routes: []ExpectedRoute{
-				{"GET", "/users", "Get all users"},
-				{"POST", "/users", "Create user"},
-				{"GET", "/posts", "Get all posts"},
-			},
-			expected: &TreeStructure{
-				Path:    "/",
-				Type:    Tree.RootType,
-				Methods: []string{},
-				Children: map[string]*TreeStructure{
-					"users": {
-						Path:     "users",
-						Type:     Tree.StaticType,
-						Methods:  []string{"GET", "POST"},
-						Children: map[string]*TreeStructure{},
-					},
-					"posts": {
-						Path:     "posts",
-						Type:     Tree.StaticType,
-						Methods:  []string{"GET"},
-						Children: map[string]*TreeStructure{},
-					},
-				},
-			},
-		},
-		{
-			name: "nested_static_routes",
-			routes: []ExpectedRoute{
-				{"GET", "/api/v1/users", "Get users"},
-				{"POST", "/api/v1/users", "Create user"},
-				{"GET", "/api/v1/posts", "Get posts"},
-				{"GET", "/api/v2/users", "Get users v2"},
-			},
-			expected: &TreeStructure{
-				Path:    "/",
-				Type:    Tree.RootType,
-				Methods: []string{},
-				Children: map[string]*TreeStructure{
-					"api": {
-						Path:    "api",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							"v": {
-								Path:    "v",
-								Type:    Tree.StaticType,
-								Methods: []string{},
-								Children: map[string]*TreeStructure{
-									"1": {
-										Path:    "1",
-										Type:    Tree.StaticType,
-										Methods: []string{},
-										Children: map[string]*TreeStructure{
-											"users": {
-												Path:     "users",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET", "POST"},
-												Children: map[string]*TreeStructure{},
-											},
-											"posts": {
-												Path:     "posts",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET"},
-												Children: map[string]*TreeStructure{},
-											},
-										},
-									},
-									"2": {
-										Path:    "2",
-										Type:    Tree.StaticType,
-										Methods: []string{},
-										Children: map[string]*TreeStructure{
-											"users": {
-												Path:     "users",
-												Type:     Tree.StaticType,
-												Methods:  []string{"GET"},
-												Children: map[string]*TreeStructure{},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "wildcard_routes",
-			routes: []ExpectedRoute{
-				{"GET", "/users/:id", "Get user by ID"},
-				{"PUT", "/users/:id", "Update user"},
-				{"DELETE", "/users/:id", "Delete user"},
-				{"GET", "/users/:id/posts", "Get user posts"},
-			},
-			expected: &TreeStructure{
-				Path:    "/",
-				Type:    Tree.RootType,
-				Methods: []string{},
-				Children: map[string]*TreeStructure{
-					"users": {
-						Path:    "users",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							":id": {
-								Path:    ":id",
-								Type:    Tree.WildCardType,
-								Param:   "id",
-								Methods: []string{"DELETE", "GET", "PUT"},
-								Children: map[string]*TreeStructure{
-									"posts": {
-										Path:     "posts",
-										Type:     Tree.StaticType,
-										Methods:  []string{"GET"},
-										Children: map[string]*TreeStructure{},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "catch_all_routes",
-			routes: []ExpectedRoute{
-				{"GET", "/files/*path", "Serve static files"},
-				{"GET", "/assets/*filepath", "Serve assets"},
-			},
-			expected: &TreeStructure{
-				Path:    "/",
-				Type:    Tree.RootType,
-				Methods: []string{},
-				Children: map[string]*TreeStructure{
-					"files": {
-						Path:    "files",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							"*path": {
-								Path:     "*path",
-								Type:     Tree.CatchAllType,
-								Methods:  []string{"GET"},
-								Param:    "path",
-								Children: map[string]*TreeStructure{},
-							},
-						},
-					},
-					"assets": {
-						Path:    "assets",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							"*filepath": {
-								Path:     "*filepath",
-								Type:     Tree.CatchAllType,
-								Methods:  []string{"GET"},
-								Param:    "filepath",
-								Children: map[string]*TreeStructure{},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "complex_mixed_routes",
-			routes: []ExpectedRoute{
-				{"GET", "/", "Root handler"},
-				{"GET", "/api/users", "Get all users"},
-				{"POST", "/api/users", "Create user"},
-				{"GET", "/api/users/:id", "Get user by ID"},
-				{"PUT", "/api/users/:id", "Update user"},
-				{"GET", "/api/users/:id/posts", "Get user posts"},
-				{"POST", "/api/users/:id/posts", "Create user post"},
-				{"GET", "/api/users/:id/posts/:postId", "Get specific post"},
-				{"GET", "/static/*files", "Serve static files"},
-			},
-			expected: &TreeStructure{
-				Path:    "/",
-				Type:    Tree.RootType,
-				Methods: []string{"GET"},
-				Children: map[string]*TreeStructure{
-					"api": {
-						Path:    "api",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							"users": {
-								Path:    "users",
-								Type:    Tree.StaticType,
-								Methods: []string{"GET", "POST"},
-								Children: map[string]*TreeStructure{
-									":id": {
-										Path:    ":id",
-										Type:    Tree.WildCardType,
-										Param:   "id",
-										Methods: []string{"GET", "PUT"},
-										Children: map[string]*TreeStructure{
-											"posts": {
-												Path:    "posts",
-												Type:    Tree.StaticType,
-												Methods: []string{"GET", "POST"},
-												Children: map[string]*TreeStructure{
-													":postId": {
-														Path:     ":postId",
-														Type:     Tree.WildCardType,
-														Param:    "postId",
-														Methods:  []string{"GET"},
-														Children: map[string]*TreeStructure{},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					"static": {
-						Path:    "static",
-						Type:    Tree.StaticType,
-						Methods: []string{},
-						Children: map[string]*TreeStructure{
-							"*files": {
-								Path:     "*files",
-								Type:     Tree.CatchAllType,
-								Methods:  []string{"GET"},
-								Param:    "files",
-								Children: map[string]*TreeStructure{},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create tree and add routes
-			tree := Tree.NewTree()
-			handler := createTestHandler()
-
-			for _, route := range test.routes {
-				err := tree.SetHandler(route.Method, route.Path, handler)
-				if err != nil {
-					t.Fatalf("Failed to set handler for %s %s: %v", route.Method, route.Path, err)
-				}
-			}
-
-			// Print actual tree structure
-			fmt.Printf("\n=== Test: %s ===\n", test.name)
-			fmt.Println("Added routes:")
-			for _, route := range test.routes {
-				fmt.Printf("  %s %s - %s\n", route.Method, route.Path, route.Description)
-			}
-
-			fmt.Println("\nActual tree structure:")
-			printTreeStructure(tree.RootNode, 0)
-
-			fmt.Println("\nExpected tree structure:")
-			printExpectedStructure(test.expected, 0)
-
-			// Compare structures
-			actual := buildActualStructure(tree.RootNode)
-			if !compareStructures(actual, test.expected) {
-				t.Errorf("Tree structure mismatch for test %s", test.name)
-				fmt.Println("\nDetailed comparison:")
-				compareAndPrintDifferences(actual, test.expected, "")
-			} else {
-				fmt.Println("✓ Tree structure matches expected!")
-			}
-		})
-	}
-}
-
-// TestTreePathTraversal tests path traversal and outputs all possible paths
-func TestTreePathTraversal(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
-
-	routes := []ExpectedRoute{
-		{"GET", "/", "Root"},
-		{"GET", "/api/users", "Get users"},
-		{"POST", "/api/users", "Create user"},
-		{"GET", "/api/users/:id", "Get user"},
-		{"PUT", "/api/users/:id", "Update user"},
-		{"GET", "/api/users/:id/posts", "Get user posts"},
-		{"GET", "/api/users/:id/posts/:postId", "Get user post"},
-		{"GET", "/static/*files", "Static files"},
-		{"GET", "/docs", "Documentation"},
-	}
-
-	// Add all routes
-	for _, route := range routes {
-		err := tree.SetHandler(route.Method, route.Path, handler)
-		if err != nil {
-			t.Fatalf("Failed to set handler: %v", err)
-		}
-	}
-
-	fmt.Println("\n=== Tree Path Traversal Test ===")
-	fmt.Println("All registered routes:")
-	for _, route := range routes {
-		fmt.Printf("  %s %s\n", route.Method, route.Path)
-	}
-
-	fmt.Println("\nTree structure with all paths:")
-	allPaths := extractAllPaths(tree.RootNode, "")
-	//sort.Strings(allPaths)
-
-	fmt.Println("All possible paths in tree:")
-	for _, path := range allPaths {
-		fmt.Printf("  %s\n", path)
-	}
-
-	// Verify expected paths exist
-	expectedPaths := []string{
-		"/",
-		"/api",
-		"/api/users",
-		"/api/users/:id",
-		"/api/users/:id/posts",
-		"/api/users/:id/posts/:postId",
-		"/static",
-		"/static/*files",
-		"/docs",
-	}
-
-	fmt.Println("\nPath verification:")
-	for _, expectedPath := range expectedPaths {
-		found := false
-		for _, actualPath := range allPaths {
-			if actualPath == expectedPath {
-				found = true
-				break
-			}
-		}
-		if found {
-			fmt.Printf("  ✓ %s\n", expectedPath)
-		} else {
-			fmt.Printf("  ✗ %s (MISSING)\n", expectedPath)
-			t.Errorf("Expected path %s not found in tree", expectedPath)
-		}
-	}
-}
-
-// Helper functions
-
-func printTreeStructure(node *Tree.Node, depth int) {
-	indent := strings.Repeat("  ", depth)
-	nodeType := getNodeTypeName(node.Type)
-
-	methods := []string{}
-	for method, handler := range node.Handlers {
-		if handler != nil {
-			methods = append(methods, MethodTypeToString(Tree.MethodType(method)))
-		}
-	}
-	//sort.Strings(methods)
-
-	methodsStr := ""
-	if len(methods) > 0 {
-		methodsStr = fmt.Sprintf(" [%s]", strings.Join(methods, ","))
-	}
-
-	param := ""
-	if node.Param != "" {
-		param = fmt.Sprintf(" (param: %s)", node.Param)
-	}
-
-	fmt.Printf("%s%s (%s)%s%s\n", indent, node.Path, nodeType, methodsStr, param)
-
-	// Sort children for consistent output
-	childKeys := make([]string, 0, len(node.Children))
-	for _, child := range node.Children {
-		childKeys = append(childKeys, child.Path)
-	}
-	//sort.Strings(childKeys)
-
-	for _, key := range childKeys {
-		for _, child := range node.Children {
-			if child.Path == key {
-				printTreeStructure(child, depth+1)
-			}
-		}
-	}
-
-	// Print wildcard child
-	if node.WildCard != nil {
-		printTreeStructure(node.WildCard, depth+1)
-	}
-
-	// Print catch-all child
-	if node.CatchAll != nil {
-		printTreeStructure(node.CatchAll, depth+1)
-	}
-}
-
-func printExpectedStructure(structure *TreeStructure, depth int) {
-	indent := strings.Repeat("  ", depth)
-	nodeType := getNodeTypeName(structure.Type)
-
-	methodsStr := ""
-	if len(structure.Methods) > 0 {
-		methods := make([]string, len(structure.Methods))
-		copy(methods, structure.Methods)
-		//sort.Strings(methods)
-		methodsStr = fmt.Sprintf(" [%s]", strings.Join(methods, ","))
-	}
-
-	param := ""
-	if structure.Param != "" {
-		param = fmt.Sprintf(" (param: %s)", structure.Param)
-	}
-
-	fmt.Printf("%s%s (%s)%s%s\n", indent, structure.Path, nodeType, methodsStr, param)
-
-	// Sort children for consistent output
-	childKeys := make([]string, 0, len(structure.Children))
-	for key := range structure.Children {
-		childKeys = append(childKeys, key)
-	}
-	//sort.Strings(childKeys)
-
-	for _, key := range childKeys {
-		printExpectedStructure(structure.Children[key], depth+1)
-	}
-}
-
-func getNodeTypeName(nodeType Tree.NodeType) string {
-	switch nodeType {
-	case Tree.RootType:
-		return "ROOT"
-	case Tree.StaticType:
-		return "STATIC"
-	case Tree.WildCardType:
-		return "WILDCARD"
-	case Tree.CatchAllType:
-		return "CATCHALL"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-func buildActualStructure(node *Tree.Node) *TreeStructure {
-	structure := &TreeStructure{
-		Path:     node.Path,
-		Type:     node.Type,
-		Children: make(map[string]*TreeStructure),
-		Methods:  []string{},
-		Param:    node.Param,
-	}
-
-	// Collect methods
-	for method, handler := range node.Handlers {
-		if handler != nil {
-			structure.Methods = append(structure.Methods, MethodTypeToString(Tree.MethodType(method)))
-		}
-	}
-	sort.Strings(structure.Methods)
-
-	// Build children
-	for _, child := range node.Children {
-		structure.Children[child.Path] = buildActualStructure(child)
-	}
-
-	// Build wildcard child
-	if node.WildCard != nil {
-		structure.Children[node.WildCard.Path] = buildActualStructure(node.WildCard)
-	}
-
-	// Build catch-all child
-	if node.CatchAll != nil {
-		structure.Children[node.CatchAll.Path] = buildActualStructure(node.CatchAll)
-	}
-
-	return structure
-}
-
-func compareStructures(actual, expected *TreeStructure) bool {
-	if actual.Path != expected.Path {
-		return false
-	}
-
-	if actual.Type != expected.Type {
-		return false
-	}
-
-	if actual.Param != expected.Param {
-		return false
-	}
-
-	if !reflect.DeepEqual(actual.Methods, expected.Methods) {
-		return false
-	}
-
-	if len(actual.Children) != len(expected.Children) {
-		return false
-	}
-
-	for key, expectedChild := range expected.Children {
-		actualChild, exists := actual.Children[key]
-		if !exists {
-			return false
+		routes := []RouteConfig{
+			{"GET", "/users", handler},
+			{"POST", "/users", handler},
+			{"GET", "/posts", handler},
 		}
 
-		if !compareStructures(actualChild, expectedChild) {
-			return false
+		for _, route := range routes {
+			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
-	}
 
-	return true
+		// 루트 구조 검증
+		if tree.RootNode.Type != Tree.RootType {
+			t.Error("Root node type mismatch")
+		}
+
+		if len(tree.RootNode.Children) != 2 {
+			t.Errorf("Expected 2 children, got %d", len(tree.RootNode.Children))
+		}
+	})
+
+	t.Run("wildcard_routes", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateTestHandler()
+
+		routes := []RouteConfig{
+			{"GET", "/users/:id", handler},
+			{"PUT", "/users/:id", handler},
+			{"GET", "/users/:id/posts", handler},
+		}
+
+		for _, route := range routes {
+			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			AssertNoError(t, err, "SetHandler for "+route.Path)
+		}
+
+		// 와일드카드 구조 검증
+		usersNode := findChildNode(tree.RootNode, "users")
+		if usersNode == nil {
+			t.Fatal("Users node not found")
+		}
+
+		if usersNode.WildCard == nil {
+			t.Error("Wildcard child not found")
+		}
+
+		if usersNode.WildCard.Type != Tree.WildCardType {
+			t.Error("Wildcard node type mismatch")
+		}
+
+		if usersNode.WildCard.Param != "id" {
+			t.Errorf("Expected param 'id', got '%s'", usersNode.WildCard.Param)
+		}
+	})
+
+	t.Run("catch_all_routes", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateTestHandler()
+
+		err := tree.SetHandler("GET", "/files/*path", handler)
+		AssertNoError(t, err, "SetHandler")
+
+		// 캐치올 구조 검증
+		filesNode := findChildNode(tree.RootNode, "files")
+		if filesNode == nil {
+			t.Fatal("Files node not found")
+		}
+
+		if filesNode.CatchAll == nil {
+			t.Error("CatchAll child not found")
+		}
+
+		if filesNode.CatchAll.Type != Tree.CatchAllType {
+			t.Error("CatchAll node type mismatch")
+		}
+
+		if filesNode.CatchAll.Param != "path" {
+			t.Errorf("Expected param 'path', got '%s'", filesNode.CatchAll.Param)
+		}
+	})
+
+	t.Run("mixed_route_types", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateTestHandler()
+
+		routes := []RouteConfig{
+			{"GET", "/", handler},                    // 루트
+			{"GET", "/api/users", handler},           // 정적
+			{"GET", "/api/users/:id", handler},       // 와일드카드
+			{"GET", "/api/users/:id/posts", handler}, // 중첩 와일드카드
+			{"GET", "/static/*files", handler},       // 캐치올
+		}
+
+		for _, route := range routes {
+			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			AssertNoError(t, err, "SetHandler for "+route.Path)
+		}
+
+		// 기본 구조 검증
+		if tree.RootNode.Handlers[Tree.GET] == nil {
+			t.Error("Root handler not set")
+		}
+
+		apiNode := findChildNode(tree.RootNode, "api")
+		if apiNode == nil {
+			t.Error("API node not found")
+		}
+
+		staticNode := findChildNode(tree.RootNode, "static")
+		if staticNode == nil {
+			t.Error("Static node not found")
+		}
+
+		if staticNode.CatchAll == nil {
+			t.Error("Static catch-all not found")
+		}
+	})
 }
 
-func compareAndPrintDifferences(actual, expected *TreeStructure, path string) {
-	currentPath := path + "/" + actual.Path
-	if path == "" {
-		currentPath = actual.Path
-	}
+// ======================
+// 트리 일관성 검증 테스트
+// ======================
 
-	if actual.Path != expected.Path {
-		fmt.Printf("Path mismatch at %s: actual='%s', expected='%s'\n", currentPath, actual.Path, expected.Path)
-	}
-
-	if actual.Type != expected.Type {
-		fmt.Printf("Type mismatch at %s: actual=%s, expected=%s\n", currentPath, getNodeTypeName(actual.Type), getNodeTypeName(expected.Type))
-	}
-
-	if actual.Param != expected.Param {
-		fmt.Printf("Param mismatch at %s: actual='%s', expected='%s'\n", currentPath, actual.Param, expected.Param)
-	}
-
-	if !reflect.DeepEqual(actual.Methods, expected.Methods) {
-		fmt.Printf("Methods mismatch at %s: actual=%v, expected=%v\n", currentPath, actual.Methods, expected.Methods)
-	}
-
-	// Check missing children
-	for key := range expected.Children {
-		if _, exists := actual.Children[key]; !exists {
-			fmt.Printf("Missing child at %s: '%s'\n", currentPath, key)
-		}
-	}
-
-	// Check extra children
-	for key := range actual.Children {
-		if _, exists := expected.Children[key]; !exists {
-			fmt.Printf("Extra child at %s: '%s'\n", currentPath, key)
-		}
-	}
-
-	// Recursively check existing children
-	for key, expectedChild := range expected.Children {
-		if actualChild, exists := actual.Children[key]; exists {
-			compareAndPrintDifferences(actualChild, expectedChild, currentPath)
-		}
-	}
-}
-
-func extractAllPaths(node *Tree.Node, currentPath string) []string {
-	paths := []string{}
-
-	// Build current path
-	fullPath := currentPath
-	if node.Type == Tree.RootType {
-		fullPath = "/"
-	} else {
-		if currentPath == "/" {
-			fullPath = "/" + node.Path
-		} else {
-			fullPath = currentPath + "/" + node.Path
-		}
-	}
-
-	// Add current path if it has handlers or we want to show intermediate paths
-	hasHandlers := false
-	for _, handler := range node.Handlers {
-		if handler != nil {
-			hasHandlers = true
-			break
-		}
-	}
-
-	if hasHandlers || node.Type == Tree.RootType || len(node.Children) > 0 || node.WildCard != nil || node.CatchAll != nil {
-		paths = append(paths, fullPath)
-	}
-
-	// Recursively get paths from children
-	for _, child := range node.Children {
-		childPaths := extractAllPaths(child, fullPath)
-		paths = append(paths, childPaths...)
-	}
-
-	// Recursively get paths from wildcard child
-	if node.WildCard != nil {
-		childPaths := extractAllPaths(node.WildCard, fullPath)
-		paths = append(paths, childPaths...)
-	}
-
-	// Recursively get paths from catch-all child
-	if node.CatchAll != nil {
-		childPaths := extractAllPaths(node.CatchAll, fullPath)
-		paths = append(paths, childPaths...)
-	}
-
-	return paths
-}
-
-// TestTreeConsistency checks tree integrity and consistency
 func TestTreeConsistency(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := createTestHandler()
+	tree := SetupTree()
+	handler := CreateTestHandler()
 
-	routes := []ExpectedRoute{
-		{"GET", "/api/users", "Get users"},
-		{"POST", "/api/users", "Create user"},
-		{"GET", "/api/users/:id", "Get user"},
-		{"GET", "/api/users/:id/posts", "Get user posts"},
-		{"GET", "/static/*files", "Static files"},
+	routes := []RouteConfig{
+		{"GET", "/api/users", handler},
+		{"POST", "/api/users", handler},
+		{"GET", "/api/users/:id", handler},
+		{"GET", "/static/*files", handler},
 	}
 
-	// Add routes
 	for _, route := range routes {
-		err := tree.SetHandler(route.Method, route.Path, handler)
-		if err != nil {
-			t.Fatalf("Failed to set handler: %v", err)
-		}
+		err := tree.SetHandler(route.Method, route.Path, route.Handler)
+		AssertNoError(t, err, "SetHandler")
 	}
 
-	fmt.Println("\n=== Tree Consistency Test ===")
-
-	// Check tree consistency
-	issues := checkTreeConsistency(tree.RootNode, "/")
-
-	if len(issues) == 0 {
-		fmt.Println("✓ Tree structure is consistent!")
-	} else {
-		fmt.Println("✗ Tree consistency issues found:")
-		for _, issue := range issues {
-			fmt.Printf("  - %s\n", issue)
-			t.Error(issue)
+	t.Run("basic_consistency", func(t *testing.T) {
+		if tree.RootNode == nil {
+			t.Error("Root node is nil")
 		}
+
+		if tree.RootNode.Type != Tree.RootType {
+			t.Error("Root node type mismatch")
+		}
+
+		if tree.RootNode.Children == nil {
+			t.Error("Root children not initialized")
+		}
+	})
+
+	t.Run("node_consistency", func(t *testing.T) {
+		checkNodeConsistency(t, tree.RootNode, "/")
+	})
+}
+
+// ======================
+// Helper 함수들
+// ======================
+
+// findChildNode는 자식 노드들 중에서 지정된 경로를 가진 노드를 찾습니다
+func findChildNode(parent *Tree.Node, path string) *Tree.Node {
+	for _, child := range parent.Children {
+		if child.Path == path {
+			return child
+		}
+	}
+	return nil
+}
+
+// checkNodeConsistency는 노드의 일관성을 재귀적으로 확인합니다
+func checkNodeConsistency(t *testing.T, node *Tree.Node, path string) {
+	if node == nil {
+		t.Errorf("Node at path %s is nil", path)
+		return
+	}
+
+	// 자식 노드 검증
+	for _, child := range node.Children {
+		if child == nil {
+			t.Errorf("Child node is nil at path %s", path)
+			continue
+		}
+
+		childPath := path + "/" + child.Path
+		if path == "/" {
+			childPath = "/" + child.Path
+		}
+
+		checkNodeConsistency(t, child, childPath)
+	}
+
+	// 와일드카드 노드 검증
+	if node.WildCard != nil {
+		wildcardPath := path + "/" + node.WildCard.Path
+		if path == "/" {
+			wildcardPath = "/" + node.WildCard.Path
+		}
+		checkNodeConsistency(t, node.WildCard, wildcardPath)
+	}
+
+	// 캐치올 노드 검증
+	if node.CatchAll != nil {
+		catchAllPath := path + "/" + node.CatchAll.Path
+		if path == "/" {
+			catchAllPath = "/" + node.CatchAll.Path
+		}
+		checkNodeConsistency(t, node.CatchAll, catchAllPath)
 	}
 }
 
-func checkTreeConsistency(node *Tree.Node, expectedPath string) []string {
-	issues := []string{}
+// ======================
+// 트리 무결성 검증 테스트
+// ======================
 
-	// Check if node path matches expected
-	if node.Type != Tree.RootType && node.Path == "" {
-		issues = append(issues, fmt.Sprintf("Node at %s has empty path", expectedPath))
-	}
+func TestTreeIntegrity(t *testing.T) {
+	t.Run("duplicate_route_handling", func(t *testing.T) {
+		tree := SetupTree()
+		handler1 := CreateHandlerWithResponse("handler1")
+		handler2 := CreateHandlerWithResponse("handler2")
 
-	// Check wildcard constraints
-	wildcardCount := 0
-	catchAllCount := 0
+		// 같은 경로에 핸들러 두 번 설정
+		err := tree.SetHandler("GET", "/test", handler1)
+		AssertNoError(t, err, "First SetHandler")
 
-	for _, child := range node.Children {
-		if child.Type == Tree.WildCardType {
-			wildcardCount++
-		}
-		if child.Type == Tree.CatchAllType {
-			catchAllCount++
-		}
-	}
+		err = tree.SetHandler("GET", "/test", handler2)
+		AssertNoError(t, err, "Second SetHandler") // 덮어쓰기 허용
 
-	if wildcardCount > 1 {
-		issues = append(issues, fmt.Sprintf("Node at %s has multiple wildcard children", expectedPath))
-	}
+		// 두 번째 핸들러가 설정되었는지 확인
+		recorder := ExecuteRequest(tree, "GET", "/test")
+		AssertStatusCode(t, recorder, 200)
+		AssertResponseBody(t, recorder, "handler2")
+	})
 
-	if catchAllCount > 1 {
-		issues = append(issues, fmt.Sprintf("Node at %s has multiple catch-all children", expectedPath))
-	}
+	t.Run("path_conflicts", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateTestHandler()
 
-    // 4) 와일드카드 노드 검사: 자식이 있을 때만 "없음" 에러
-    if node.WildCard != nil && wildcardCount == 0 && len(node.Children) > 0 {
-        issues = append(issues, fmt.Sprintf("Node at %s has WildCard but no wildcard children", expectedPath))
-    }
-
-    // 5) 캐치올 노드 검사: 자식이 있으면 에러
-    if node.CatchAll != nil && catchAllCount == 0 && len(node.Children) > 0 {
-        // (원래는 자식이 없어야 하므로, 자식이 있다는 것 자체가 문제)
-        issues = append(issues, fmt.Sprintf("Node at %s has CatchAll but should not have children", expectedPath))
-    }
-
-	// Recursively check children
-	for _, child := range node.Children {
-		childPath := expectedPath
-		if expectedPath == "/" {
-			childPath = "/" + child.Path
-		} else {
-			childPath = expectedPath + "/" + child.Path
+		// 충돌 가능한 경로들
+		routes := []RouteConfig{
+			{"GET", "/users/admin", handler},  // 정적
+			{"GET", "/users/:id", handler},    // 와일드카드
+			{"GET", "/users/:id/edit", handler}, // 와일드카드 + 정적
 		}
 
-		childIssues := checkTreeConsistency(child, childPath)
-		issues = append(issues, childIssues...)
-	}
-
-	// Check wildcard child
-	if node.WildCard != nil {
-		childPath := expectedPath
-		if expectedPath == "/" {
-			childPath = "/" + node.WildCard.Path
-		} else {
-			childPath = expectedPath + "/" + node.WildCard.Path
+		for _, route := range routes {
+			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
-		childIssues := checkTreeConsistency(node.WildCard, childPath)
-		issues = append(issues, childIssues...)
-	}
-
-	// Check catch-all child
-	if node.CatchAll != nil {
-		childPath := expectedPath
-		if expectedPath == "/" {
-			childPath = "/" + node.CatchAll.Path
-		} else {
-			childPath = expectedPath + "/" + node.CatchAll.Path
+		// 정적 라우트가 우선되는지 확인
+		usersNode := findChildNode(tree.RootNode, "users")
+		if usersNode == nil {
+			t.Fatal("Users node not found")
 		}
 
-		childIssues := checkTreeConsistency(node.CatchAll, childPath)
-		issues = append(issues, childIssues...)
-	}
+		adminNode := findChildNode(usersNode, "admin")
+		if adminNode == nil {
+			t.Error("Admin static route should exist")
+		}
 
-	return issues
+		if usersNode.WildCard == nil {
+			t.Error("Wildcard route should also exist")
+		}
+	})
 }

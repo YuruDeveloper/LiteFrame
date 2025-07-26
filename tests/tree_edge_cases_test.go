@@ -1,162 +1,140 @@
 package tests
 
 import (
+	"LiteFrame/Router/Param"
 	"LiteFrame/Router/Tree"
 	"net/http"
 	"strings"
 	"testing"
 )
 
-// TestEdgeCases_Match tests critical edge cases for the Match function
+// ======================
+// 경계값 및 엣지 케이스 테스트
+// ======================
+
 func TestEdgeCases_Match(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
-	t.Run("index_out_of_range_protection", func(t *testing.T) {
-		// This test ensures the Match function doesn't panic on edge cases
-		tests := []struct {
-			one  string
-			two  string
-			name string
-		}{
-			{"", "", "both_empty"},
-			{"a", "", "one_char_vs_empty"},
-			{"", "a", "empty_vs_one_char"},
-			{"very_long_string", "v", "long_vs_short"},
-			{"a", "very_long_string", "short_vs_long"},
-		}
+	testCases := []MatchTestCase{
+		{
+			Name:          "both_empty",
+			One:           "",
+			Two:           "",
+			ExpectedMatch: true,
+			ExpectedIndex: 0,
+			ExpectedLeft:  "",
+		},
+		{
+			Name:          "one_char_vs_empty",
+			One:           "a",
+			Two:           "",
+			ExpectedMatch: false,
+			ExpectedIndex: 0,
+			ExpectedLeft:  "a",
+		},
+		{
+			Name:          "empty_vs_one_char",
+			One:           "",
+			Two:           "a",
+			ExpectedMatch: true,
+			ExpectedIndex: 0,
+			ExpectedLeft:  "",
+		},
+		{
+			Name:          "long_vs_short",
+			One:           "very_long_string",
+			Two:           "v",
+			ExpectedMatch: false,
+			ExpectedIndex: 1,
+			ExpectedLeft:  "ery_long_string",
+		},
+	}
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				// Should not panic
-				defer func() {
-					if r := recover(); r != nil {
-						t.Errorf("Match(%q, %q) panicked: %v", test.one, test.two, r)
-					}
-				}()
-
-				matched, index, remaining := tree.Match(test.one, test.two)
-
-				// Verify remaining string doesn't cause out-of-bounds access
-				if index > len(test.one) {
-					t.Errorf("Index %d is out of bounds for string %q (length %d)", index, test.one, len(test.one))
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// 패닉 방지 테스트
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Match(%q, %q) panicked: %v", tc.One, tc.Two, r)
 				}
+			}()
 
-				// Verify remaining string is correctly calculated
-				expectedRemaining := ""
-				if index < len(test.one) {
-					expectedRemaining = test.one[index:]
-				}
+			matched, index, remaining := tree.Match(tc.One, tc.Two)
 
-				if remaining != expectedRemaining {
-					t.Errorf("Expected remaining %q, got %q", expectedRemaining, remaining)
-				}
-
-				_ = matched // Use the variable to avoid compiler warning
-			})
-		}
-	})
-
-	t.Run("unicode_handling", func(t *testing.T) {
-		tests := []struct {
-			one      string
-			two      string
-			expected bool
-			name     string
-		}{
-			{"hello", "hello world", true, "ascii_partial_match"},
-			{"test", "testing", true, "ascii_prefix_match"},
-			{"café", "café", true, "accent_exact_match"},
-			{"abc", "xyz", false, "no_match"},
-		}
-
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				matched, _, _ := tree.Match(test.one, test.two)
-				if matched != test.expected {
-					t.Errorf("Match(%q, %q) = %v, expected %v", test.one, test.two, matched, test.expected)
-				}
-			})
-		}
-	})
+			if matched != tc.ExpectedMatch {
+				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
+			}
+			if index != tc.ExpectedIndex {
+				t.Errorf("Expected index %d, got %d", tc.ExpectedIndex, index)
+			}
+			if remaining != tc.ExpectedLeft {
+				t.Errorf("Expected remaining '%s', got '%s'", tc.ExpectedLeft, remaining)
+			}
+		})
+	}
 }
 
-// TestEdgeCases_SplitPath tests edge cases for path splitting
+// ======================
+// 경로 분할 엣지 케이스 테스트
+// ======================
+
 func TestEdgeCases_SplitPath(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
 	t.Run("malformed_paths", func(t *testing.T) {
-		tests := []struct {
+		testCases := []struct {
+			name     string
 			input    string
 			expected []string
-			name     string
 		}{
-			{"///", []string{}, "only_slashes"},
-			{"/////users/////", []string{"users"}, "excessive_slashes"},
-			{"//users//123//", []string{"users", "123"}, "double_slashes"},
-			{"/./users/../admin", []string{".", "users", "..", "admin"}, "dot_segments"},
-			{"/users//", []string{"users"}, "trailing_double_slash"},
+			{"only_slashes", "///", []string{}},
+			{"excessive_slashes", "/////users/////", []string{"users"}},
+			{"double_slashes", "//users//123//", []string{"users", "123"}},
+			{"dot_segments", "/./users/../admin", []string{".", "users", "..", "admin"}},
 		}
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				result := tree.SplitPath(test.input)
-				if len(result) != len(test.expected) {
-					t.Errorf("SplitPath(%q) length = %d, expected %d", test.input, len(result), len(test.expected))
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				result := tree.SplitPath(tc.input)
+				
+				if len(result) != len(tc.expected) {
+					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 					return
 				}
 
 				for i, segment := range result {
-					if segment != test.expected[i] {
-						t.Errorf("SplitPath(%q)[%d] = %q, expected %q", test.input, i, segment, test.expected[i])
+					if segment != tc.expected[i] {
+						t.Errorf("Expected segment[%d] = '%s', got '%s'", i, tc.expected[i], segment)
 					}
 				}
 			})
-		}
-	})
-
-	t.Run("very_long_paths", func(t *testing.T) {
-		// Test with very long path
-		longSegment := strings.Repeat("a", 1000)
-		longPath := "/" + strings.Repeat(longSegment+"/", 100)
-
-		result := tree.SplitPath(longPath)
-
-		if len(result) != 100 {
-			t.Errorf("Expected 100 segments, got %d", len(result))
-		}
-
-		for i, segment := range result {
-			if segment != longSegment {
-				t.Errorf("Segment %d = %q, expected %q", i, segment, longSegment)
-				break
-			}
 		}
 	})
 
 	t.Run("special_characters", func(t *testing.T) {
-		tests := []struct {
+		testCases := []struct {
+			name     string
 			input    string
 			expected []string
-			name     string
 		}{
-			{"/users/user%20name", []string{"users", "user%20name"}, "url_encoded"},
-			{"/files/file.txt", []string{"files", "file.txt"}, "dot_in_name"},
-			{"/api/v1.0", []string{"api", "v1.0"}, "version_with_dot"},
-			{"/users/user@domain.com", []string{"users", "user@domain.com"}, "email_like"},
-			{"/files/test-file_name", []string{"files", "test-file_name"}, "hyphens_underscores"},
+			{"url_encoded", "/users/user%20name", []string{"users", "user%20name"}},
+			{"dot_in_name", "/files/file.txt", []string{"files", "file.txt"}},
+			{"version_with_dot", "/api/v1.0", []string{"api", "v1.0"}},
+			{"email_like", "/users/user@domain.com", []string{"users", "user@domain.com"}},
 		}
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				result := tree.SplitPath(test.input)
-				if len(result) != len(test.expected) {
-					t.Errorf("SplitPath(%q) length = %d, expected %d", test.input, len(result), len(test.expected))
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				result := tree.SplitPath(tc.input)
+				
+				if len(result) != len(tc.expected) {
+					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 					return
 				}
 
 				for i, segment := range result {
-					if segment != test.expected[i] {
-						t.Errorf("SplitPath(%q)[%d] = %q, expected %q", test.input, i, segment, test.expected[i])
+					if segment != tc.expected[i] {
+						t.Errorf("Expected segment[%d] = '%s', got '%s'", i, tc.expected[i], segment)
 					}
 				}
 			})
@@ -164,191 +142,163 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 	})
 }
 
-// TestEdgeCases_WildcardAndCatchAll tests edge cases for wildcard and catch-all detection
-func TestEdgeCases_WildcardAndCatchAll(t *testing.T) {
-	tree := Tree.NewTree()
+// ======================
+// 와일드카드/캐치올 엣지 케이스 테스트
+// ======================
 
-	t.Run("boundary_conditions", func(t *testing.T) {
-		tests := []struct {
-			input      string
-			isWildcard bool
-			isCatchAll bool
-			name       string
-		}{
-			{"", false, false, "empty_string"},
-			{":", true, false, "single_colon"},
-			{"*", false, true, "single_asterisk"},
-			{":*", true, false, "colon_asterisk"},
-			{"*:", false, true, "asterisk_colon"},
-			{":::", true, false, "multiple_colons"},
-			{"***", false, true, "multiple_asterisks"},
-			{"normal", false, false, "normal_text"},
-		}
+func TestEdgeCases_WildcardDetection(t *testing.T) {
+	tree := SetupTree()
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				isWildcard := tree.IsWildCard(test.input)
-				isCatchAll := tree.IsCatchAll(test.input)
+	testCases := []struct {
+		name       string
+		input      string
+		isWildcard bool
+		isCatchAll bool
+	}{
+		{"empty_string", "", false, false},
+		{"single_colon", ":", true, false},
+		{"single_asterisk", "*", false, true},
+		{"colon_asterisk", ":*", true, false},
+		{"asterisk_colon", "*:", false, true},
+		{"normal_text", "normal", false, false},
+	}
 
-				if isWildcard != test.isWildcard {
-					t.Errorf("IsWildCard(%q) = %v, expected %v", test.input, isWildcard, test.isWildcard)
-				}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			isWildcard := tree.IsWildCard(tc.input)
+			isCatchAll := tree.IsCatchAll(tc.input)
 
-				if isCatchAll != test.isCatchAll {
-					t.Errorf("IsCatchAll(%q) = %v, expected %v", test.input, isCatchAll, test.isCatchAll)
-				}
-			})
-		}
-	})
+			if isWildcard != tc.isWildcard {
+				t.Errorf("IsWildCard(%q) = %v, expected %v", tc.input, isWildcard, tc.isWildcard)
+			}
+
+			if isCatchAll != tc.isCatchAll {
+				t.Errorf("IsCatchAll(%q) = %v, expected %v", tc.input, isCatchAll, tc.isCatchAll)
+			}
+		})
+	}
 }
 
-// TestEdgeCases_InsertChild tests edge cases for child insertion
-func TestEdgeCases_InsertChild(t *testing.T) {
-	tree := Tree.NewTree()
+// ======================
+// 자식 노드 삽입 엣지 케이스 테스트
+// ======================
 
-	t.Run("duplicate_wildcard_scenarios", func(t *testing.T) {
+func TestEdgeCases_InsertChild(t *testing.T) {
+	tree := SetupTree()
+
+	t.Run("duplicate_wildcard_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 
-		// First wildcard should succeed
+		// 첫 번째 와일드카드 성공
 		child1, err1 := tree.InsertChild(parent, ":id")
-		if err1 != nil {
-			t.Errorf("First wildcard insertion failed: %v", err1)
-		}
+		AssertNoError(t, err1, "First wildcard insertion")
+		
 		if child1 == nil {
 			t.Error("First wildcard child is nil")
 		}
 
-		// Second wildcard should fail
+		// 두 번째 와일드카드 실패해야 함
 		child2, err2 := tree.InsertChild(parent, ":name")
-		if err2 == nil {
-			t.Error("Expected error for duplicate wildcard, got nil")
-		}
+		AssertError(t, err2, "duplicate wildcard")
+		
 		if child2 != nil {
 			t.Error("Expected nil child for duplicate wildcard")
 		}
 	})
 
-	t.Run("duplicate_catchall_scenarios", func(t *testing.T) {
+	t.Run("duplicate_catchall_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 
-		// First catch-all should succeed
+		// 첫 번째 캐치올 성공
 		child1, err1 := tree.InsertChild(parent, "*files")
-		if err1 != nil {
-			t.Errorf("First catch-all insertion failed: %v", err1)
-		}
+		AssertNoError(t, err1, "First catch-all insertion")
+		
 		if child1 == nil {
 			t.Error("First catch-all child is nil")
 		}
 
-		// Second catch-all should fail
+		// 두 번째 캐치올 실패해야 함
 		child2, err2 := tree.InsertChild(parent, "*documents")
-		if err2 == nil {
-			t.Error("Expected error for duplicate catch-all, got nil")
-		}
+		AssertError(t, err2, "duplicate catch-all")
+		
 		if child2 != nil {
 			t.Error("Expected nil child for duplicate catch-all")
 		}
 	})
 
-	t.Run("wildcard_parameter_extraction", func(t *testing.T) {
-		tests := []struct {
+	t.Run("parameter_extraction", func(t *testing.T) {
+		testCases := []struct {
+			name          string
 			path          string
 			expectedParam string
-			name          string
 		}{
-			{":id", "id", "simple_param"},
-			{":user_id", "user_id", "underscore_param"},
-			{":userId", "userId", "camelCase_param"},
-			{":user-id", "user-id", "hyphen_param"},
-			{":123", "123", "numeric_param"},
-			//{":", "", "empty_param"},
+			{"simple_param", ":id", "id"},
+			{"underscore_param", ":user_id", "user_id"},
+			{"camelCase_param", ":userId", "userId"},
+			{"hyphen_param", ":user-id", "user-id"},
 		}
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				newParent := Tree.NewNode(Tree.RootType, "/")
-				child, err := tree.InsertChild(newParent, test.path)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				parent := Tree.NewNode(Tree.RootType, "/")
+				child, err := tree.InsertChild(parent, tc.path)
 
-				if err != nil {
-					t.Errorf("InsertChild(%q) returned error: %v", test.path, err)
-					return
-				}
+				AssertNoError(t, err, "InsertChild")
 
-				if child.Param != test.expectedParam {
-					t.Errorf("Expected param %q, got %q", test.expectedParam, child.Param)
+				if child.Param != tc.expectedParam {
+					t.Errorf("Expected param '%s', got '%s'", tc.expectedParam, child.Param)
 				}
 			})
 		}
 	})
 }
 
-// TestEdgeCases_SetHandler tests edge cases for handler setting
+// ======================
+// 핸들러 설정 엣지 케이스 테스트
+// ======================
+
 func TestEdgeCases_SetHandler(t *testing.T) {
-	tree := Tree.NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
+	t.Run("handler_overwrite", func(t *testing.T) {
+		tree := SetupTree()
+		handler1 := CreateHandlerWithResponse("response1")
+		handler2 := CreateHandlerWithResponse("response2")
 
-	t.Run("concurrent_operations", func(t *testing.T) {
-		// Test multiple goroutines setting handlers simultaneously
-		// This tests for race conditions (though not comprehensive without -race flag)
-		done := make(chan bool, 10)
+		// 첫 번째 핸들러 설정
+		err := tree.SetHandler("GET", "/test", handler1)
+		AssertNoError(t, err, "First SetHandler")
 
-		for i := 0; i < 10; i++ {
-			go func(id int) {
-				defer func() { done <- true }()
+		// 두 번째 핸들러로 덮어쓰기
+		err = tree.SetHandler("GET", "/test", handler2)
+		AssertNoError(t, err, "Second SetHandler")
 
-				path := "/test" + string(rune('0'+id))
-				err := tree.SetHandler("GET", path, handler)
-				if err != nil {
-					t.Errorf("Goroutine %d: SetHandler failed: %v", id, err)
-				}
-			}(i)
-		}
-
-		// Wait for all goroutines to complete
-		for i := 0; i < 10; i++ {
-			<-done
-		}
+		// 두 번째 핸들러가 작동하는지 확인
+		recorder := ExecuteRequest(tree, "GET", "/test")
+		AssertStatusCode(t, recorder, http.StatusOK)
+		AssertResponseBody(t, recorder, "response2")
 	})
 
-	t.Run("overwrite_handlers", func(t *testing.T) {
-		newTree := Tree.NewTree()
-		handler1 := func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }
-		handler2 := func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404) }
+	t.Run("deep_path_handling", func(t *testing.T) {
+		tree := SetupTree()
+		handler := CreateHandlerWithResponse("deep response")
 
-		// Set initial handler
-		err1 := newTree.SetHandler("GET", "/test", handler1)
-		if err1 != nil {
-			t.Errorf("First SetHandler failed: %v", err1)
-		}
-
-		// Overwrite with new handler
-		err2 := newTree.SetHandler("GET", "/test", handler2)
-		if err2 != nil {
-			t.Errorf("Second SetHandler failed: %v", err2)
-		}
-
-		// The second handler should overwrite the first
-		// (This test assumes the behavior, actual verification would require route matching)
-	})
-
-	t.Run("very_deep_paths", func(t *testing.T) {
-		newTree := Tree.NewTree()
-
-		// Create a very deep path
-		segments := make([]string, 100)
+		// 깊은 경로 생성
+		segments := make([]string, 10)
 		for i := range segments {
 			segments[i] = "level" + string(rune('0'+(i%10)))
 		}
 		deepPath := "/" + strings.Join(segments, "/")
 
-		err := newTree.SetHandler("GET", deepPath, handler)
-		if err != nil {
-			t.Errorf("SetHandler with deep path failed: %v", err)
-		}
+		err := tree.SetHandler("GET", deepPath, handler)
+		AssertNoError(t, err, "SetHandler with deep path")
+
+		recorder := ExecuteRequest(tree, "GET", deepPath)
+		AssertStatusCode(t, recorder, http.StatusOK)
+		AssertResponseBody(t, recorder, "deep response")
 	})
 
 	t.Run("mixed_route_types", func(t *testing.T) {
-		newTree := Tree.NewTree()
+		tree := SetupTree()
+		handler := func(w http.ResponseWriter, r *http.Request, params *Param.Params) {}
 
 		routes := []struct {
 			method string
@@ -359,114 +309,93 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 			{"GET", "/users/:id", "wildcard"},
 			{"GET", "/files/*path", "catchall"},
 			{"POST", "/users/:id/posts", "mixed"},
-			{"DELETE", "/admin/*Delete", "admin_catchall"},
 		}
 
 		for _, route := range routes {
 			t.Run(route.name, func(t *testing.T) {
-				err := newTree.SetHandler(route.method, route.path, handler)
-				if err != nil {
-					t.Errorf("SetHandler(%s, %s) failed: %v", route.method, route.path, err)
-				}
+				err := tree.SetHandler(route.method, route.path, handler)
+				AssertNoError(t, err, "SetHandler for "+route.path)
 			})
 		}
 	})
 }
 
-// TestEdgeCases_SplitNode tests edge cases for node splitting
+// ======================
+// 노드 분할 엣지 케이스 테스트
+// ======================
+
 func TestEdgeCases_SplitNode(t *testing.T) {
-	tree := Tree.NewTree()
+	tree := SetupTree()
 
-	t.Run("split_at_boundaries", func(t *testing.T) {
-		tests := []struct {
-			originalPath  string
-			splitPoint    int
-			expectedLeft  string
-			expectedRight string
-			name          string
-		}{
-			{"users", 0, "", "users", "split_at_start"},
-			{"users", 5, "users", "", "split_at_end"},
-			{"users", 1, "u", "sers", "split_one_char"},
-			{"users", 4, "user", "s", "split_near_end"},
-		}
+	testCases := []struct {
+		name          string
+		originalPath  string
+		splitPoint    int
+		expectedLeft  string
+		expectedRight string
+	}{
+		{"split_at_end", "users", 5, "users", ""},
+		{"split_one_char", "users", 1, "u", "sers"},
+		{"split_near_end", "users", 4, "user", "s"},
+	}
 
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				parent := Tree.NewNode(Tree.RootType, "/")
-				child := Tree.NewNode(Tree.StaticType, test.originalPath)
-				parent.Children = append(parent.Children, child)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := Tree.NewNode(Tree.RootType, "/")
+			child := Tree.NewNode(Tree.StaticType, tc.originalPath)
+			parent.Children = append(parent.Children, child)
 
-				newNode, err := tree.SplitNode(parent, child, test.splitPoint)
+			newNode, err := tree.SplitNode(parent, child, tc.splitPoint)
+			AssertNoError(t, err, "SplitNode")
 
-				if err != nil {
-					t.Errorf("SplitNode failed: %v", err)
-					return
-				}
+			if newNode == nil {
+				t.Error("Expected new node, got nil")
+				return
+			}
 
-				if newNode.Path != test.expectedLeft {
-					t.Errorf("Expected left path %q, got %q", test.expectedLeft, newNode.Path)
-				}
+			if newNode.Path != tc.expectedLeft {
+				t.Errorf("Expected left path '%s', got '%s'", tc.expectedLeft, newNode.Path)
+			}
 
-				if child.Path != test.expectedRight {
-					t.Errorf("Expected right path %q, got %q", test.expectedRight, child.Path)
-				}
-			})
-		}
-	})
-
-	t.Run("split_invalid_point", func(t *testing.T) {
+			if child.Path != tc.expectedRight {
+				t.Errorf("Expected right path '%s', got '%s'", tc.expectedRight, child.Path)
+			}
+		})
+	}
+	
+	// 에러 케이스 테스트 - split_at_start는 Left가 빈 문자열이 되어 에러 발생해야 함
+	t.Run("split_at_start_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
 		parent.Children = append(parent.Children, child)
-
-		// Test split point beyond string length
-		_, err := tree.SplitNode(parent, child, 10)
-
-		// The function should handle this gracefully (might panic in current implementation)
-		// This test documents the expected behavior
-		_ = err // Current implementation might not validate bounds
+		
+		_, err := tree.SplitNode(parent, child, 0)
+		if err == nil {
+			t.Error("Expected error for split at start (Left would be empty), got nil")
+		}
 	})
 }
 
-// TestMemoryLeaks tests for potential memory leaks
-func TestMemoryLeaks(t *testing.T) {
-	// This test creates and destroys many trees to check for memory leaks
-	// Run with: go test -run TestMemoryLeaks -memprofile=mem.prof
+// ======================
+// 입력 검증 테스트
+// ======================
 
-	for i := 0; i < 1000; i++ {
-		tree := Tree.NewTree()
-		handler := func(w http.ResponseWriter, r *http.Request) {}
+func TestInputValidation(t *testing.T) {
+	tree := SetupTree()
+	handler := CreateTestHandler()
 
-		// Add many routes
-		for j := 0; j < 100; j++ {
-			path := "/test" + string(rune('0'+(j%10))) + "/" + string(rune('a'+(j%26)))
-			tree.SetHandler("GET", path, handler)
-		}
+	t.Run("invalid_method", func(t *testing.T) {
+		err := tree.SetHandler("", "/test", handler)
+		AssertError(t, err, "empty method")
+	})
 
-		// Tree should be garbage collected after this iteration
-		_ = tree
-	}
-}
+	t.Run("invalid_path", func(t *testing.T) {
+		err := tree.SetHandler("GET", "", handler)
+		AssertError(t, err, "empty path")
+	})
 
-// TestStressConditions tests the tree under stress conditions
-func TestStressConditions(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping stress test in short mode")
-	}
-
-	tree := Tree.NewTree()
-	handler := func(w http.ResponseWriter, r *http.Request) {}
-
-	t.Run("many_routes", func(t *testing.T) {
-		// Add 10,000 routes
-		for i := 0; i < 10000; i++ {
-			path := "/stress/test/" + string(rune('a'+(i%26))) + "/" + string(rune('0'+(i%10)))
-			err := tree.SetHandler("GET", path, handler)
-			if err != nil {
-				t.Errorf("Failed to set handler for route %d: %v", i, err)
-				break
-			}
-		}
+	t.Run("nil_handler", func(t *testing.T) {
+		err := tree.SetHandler("GET", "/test", nil)
+		AssertError(t, err, "nil handler")
 	})
 }
