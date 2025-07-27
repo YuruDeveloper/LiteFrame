@@ -59,7 +59,17 @@ func TestEdgeCases_Match(t *testing.T) {
 				}
 			}()
 
-			matched, index, remaining := tree.Match(tc.One, tc.Two)
+			// PathWithSegment 생성
+			var pws *Tree.PathWithSegment
+			if tc.One == "" {
+				pws = Tree.NewPathWithSegment("")
+			} else {
+				pws = Tree.NewPathWithSegment("/" + tc.One)
+				pws.Next() // 첫 번째 세그먼트로 이동
+			}
+			
+			matched, index, left := tree.Match(*pws, tc.Two)
+			remaining := left.Get()
 
 			if matched != tc.ExpectedMatch {
 				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
@@ -79,7 +89,6 @@ func TestEdgeCases_Match(t *testing.T) {
 // ======================
 
 func TestEdgeCases_SplitPath(t *testing.T) {
-	tree := SetupTree()
 
 	t.Run("malformed_paths", func(t *testing.T) {
 		testCases := []struct {
@@ -95,7 +104,20 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				result := tree.SplitPath(tc.input)
+				// PathWithSegment로 변환하여 테스트
+				pws := Tree.NewPathWithSegment(tc.input)
+				var result []string
+				
+				for {
+					pws.Next()
+					if pws.IsSame() {
+						break
+					}
+					segment := pws.Get()
+					if segment != "" {
+						result = append(result, segment)
+					}
+				}
 				
 				if len(result) != len(tc.expected) {
 					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
@@ -125,7 +147,20 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				result := tree.SplitPath(tc.input)
+				// PathWithSegment로 변환하여 테스트
+				pws := Tree.NewPathWithSegment(tc.input)
+				var result []string
+				
+				for {
+					pws.Next()
+					if pws.IsSame() {
+						break
+					}
+					segment := pws.Get()
+					if segment != "" {
+						result = append(result, segment)
+					}
+				}
 				
 				if len(result) != len(tc.expected) {
 					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))

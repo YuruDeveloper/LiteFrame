@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"LiteFrame/Router/Tree"
 	"testing"
 )
 
@@ -8,10 +9,8 @@ import (
 // Tree 핵심 기능 벤치마크
 // ======================
 
-// BenchmarkSplitPath는 경로 분할 성능을 측정합니다
-func BenchmarkSplitPath(b *testing.B) {
-	tree := SetupBenchTree()
-	
+// BenchmarkPathWithSegment는 새로운 경로 분할 성능을 측정합니다
+func BenchmarkPathWithSegment(b *testing.B) {
 	testCases := []struct {
 		name string
 		path string
@@ -26,13 +25,17 @@ func BenchmarkSplitPath(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.SplitPath(tc.path)
+				path := Tree.NewPathWithSegment(tc.path)
+				for !path.IsSame() {
+					path.Next()
+					_ = path.Get()
+				}
 			}
 		})
 	}
 }
 
-// BenchmarkMatch는 문자열 매칭 성능을 측정합니다
+// BenchmarkMatch는 새로운 문자열 매칭 성능을 측정합니다
 func BenchmarkMatch(b *testing.B) {
 	tree := SetupBenchTree()
 	
@@ -49,9 +52,10 @@ func BenchmarkMatch(b *testing.B) {
 
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
+			sourcePath := Tree.NewPathWithSegment(tc.one)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.Match(tc.one, tc.two)
+				tree.Match(*sourcePath, tc.two)
 			}
 		})
 	}
@@ -187,7 +191,6 @@ func BenchmarkTreeOperations(b *testing.B) {
 	})
 
 	b.Run("path_processing", func(b *testing.B) {
-		tree := SetupBenchTree()
 		paths := []string{
 			"/users/123/posts/456",
 			"/files/static/css/main.css",
@@ -196,8 +199,12 @@ func BenchmarkTreeOperations(b *testing.B) {
 		
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			for _, path := range paths {
-				tree.SplitPath(path)
+			for _, pathStr := range paths {
+				path := Tree.NewPathWithSegment(pathStr)
+				for !path.IsSame() {
+					path.Next()
+					_ = path.Get()
+				}
 			}
 		}
 	})

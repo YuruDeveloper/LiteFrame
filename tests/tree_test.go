@@ -38,12 +38,10 @@ func TestNewTree(t *testing.T) {
 }
 
 // ======================
-// 경로 분할 테스트
+// PathWithSegment 테스트
 // ======================
 
-func TestSplitPath(t *testing.T) {
-	tree := SetupTree()
-
+func TestPathWithSegment(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    string
@@ -57,14 +55,29 @@ func TestSplitPath(t *testing.T) {
 		{"no_leading_slash", "users/123", []string{"users", "123"}},
 		{"trailing_slash", "/users/", []string{"users"}},
 		{"multiple_slashes", "//users//123//", []string{"users", "123"}},
+		{"wildcard_param", "/users/:id", []string{"users", ":id"}},
+		{"catchall_param", "/files/*path", []string{"files", "*path"}},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := tree.SplitPath(tc.input)
+			pws := Tree.NewPathWithSegment(tc.input)
+			var result []string
+			
+			for {
+				pws.Next()
+				if pws.IsSame() {
+					break
+				}
+				segment := pws.Get()
+				if segment != "" {
+					result = append(result, segment)
+				}
+			}
 			
 			if len(result) != len(tc.expected) {
-				t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
+				t.Errorf("Expected length %d, got %d for path '%s'", len(tc.expected), len(result), tc.input)
+				t.Errorf("Expected: %v, Got: %v", tc.expected, result)
 				return
 			}
 
@@ -185,7 +198,19 @@ func TestMatch(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			matched, index, left := tree.Match(tc.One, tc.Two)
+			// PathWithSegment 생성
+			var pws *Tree.PathWithSegment
+			if tc.One == "" {
+				pws = Tree.NewPathWithSegment("")
+			} else {
+				pws = Tree.NewPathWithSegment("/" + tc.One)
+				pws.Next() // 첫 번째 세그먼트로 이동
+			}
+			
+			matched, index, leftPws := tree.Match(*pws, tc.Two)
+			
+			// Match 후 남은 부분을 Get()으로 가져오기
+			left := leftPws.Get()
 
 			if matched != tc.ExpectedMatch {
 				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
@@ -389,9 +414,10 @@ func TestTryMatch(t *testing.T) {
 
 	t.Run("no_children", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
-		paths := []string{"users"}
+		pws := Tree.NewPathWithSegment("/users")
+		pws.Next() // 첫 번째 세그먼트로 이동
 
-		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
+		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
 		AssertNoError(t, err, "TryMatch")
 		
 		if matched {
@@ -403,9 +429,10 @@ func TestTryMatch(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
 		parent.Children = append(parent.Children, child)
-		paths := []string{"users", "123"}
+		pws := Tree.NewPathWithSegment("/users/123")
+		pws.Next() // 첫 번째 세그먼트로 이동
 
-		matched, err := tree.TryMatch(parent, paths, Tree.GET, handler)
+		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
 		AssertNoError(t, err, "TryMatch")
 		
 		if !matched {

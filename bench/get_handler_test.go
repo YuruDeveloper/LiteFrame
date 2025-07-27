@@ -98,53 +98,25 @@ func BenchmarkGetHandler_RouteTypes(b *testing.B) {
 func BenchmarkGetHandler_PathComplexity(b *testing.B) {
 	tree := SetupBenchTreeWithRoutes(GetComplexRoutes())
 
-	b.Run("depth_1", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/health")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
+	complexityTests := []struct {
+		name string
+		path string
+	}{
+		{"depth_1", "/health"},
+		{"depth_3", "/api/v1/users"},
+		{"depth_4", "/api/v1/users/123"},
+		{"depth_6", "/api/v1/projects/456/tasks/789"},
+	}
 
-	b.Run("depth_2", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/api/v1")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
-
-	b.Run("depth_3", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/api/v1/users")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
-
-	b.Run("depth_4", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/api/v1/users/123")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
-
-	b.Run("depth_5", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/api/v1/users/123/profile")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
-
-	b.Run("depth_6", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/api/v1/projects/456/tasks/789")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
+	for _, test := range complexityTests {
+		b.Run(test.name, func(b *testing.B) {
+			httpReq := CreateBenchRequest("GET", test.path)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				tree.GetHandler(httpReq)
+			}
+		})
+	}
 }
 
 // ======================
@@ -176,27 +148,16 @@ func BenchmarkGetHandler_HTTPMethods(b *testing.B) {
 // BenchmarkGetHandler_TreeSize는 트리 크기에 따른 성능을 측정합니다
 func BenchmarkGetHandler_TreeSize(b *testing.B) {
 	handler := CreateBenchHandlerWithParams()
-	
-	treeSizes := []struct {
-		name      string
-		routeCount int
-	}{
-		{"small_10", 10},
-		{"medium_50", 50},
-		{"large_100", 100},
-		{"xlarge_200", 200},
-	}
+	treeSizes := []int{50, 100, 200}
 
 	for _, size := range treeSizes {
-		b.Run(size.name, func(b *testing.B) {
-			// 트리 생성
+		b.Run(fmt.Sprintf("routes_%d", size), func(b *testing.B) {
 			tree := SetupBenchTree()
-			for i := 0; i < size.routeCount; i++ {
+			for i := 0; i < size; i++ {
 				path := generateDynamicPath(i)
 				tree.SetHandler("GET", path, handler)
 			}
 
-			// 테스트 요청
 			testPath := "/users/123/posts/456"
 			tree.SetHandler("GET", testPath, handler)
 			httpReq := CreateBenchRequest("GET", testPath)
@@ -217,14 +178,6 @@ func BenchmarkGetHandler_TreeSize(b *testing.B) {
 func BenchmarkGetHandler_Concurrent(b *testing.B) {
 	tree := SetupBenchTreeWithRoutes(GetStandardRoutes())
 	requests := GetStandardRequests()
-
-	b.Run("single_goroutine", func(b *testing.B) {
-		httpReq := CreateBenchRequest("GET", "/users/123")
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tree.GetHandler(httpReq)
-		}
-	})
 
 	b.Run("parallel", func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
