@@ -46,7 +46,6 @@ func (Instance *PathWithSegment) Get() string {
 }
 
 func (Instance *PathWithSegment) GetToEnd() string {
-	Instance.Next()
 	return string(Instance.Body[Instance.Start:])
 }
 
