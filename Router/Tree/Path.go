@@ -49,6 +49,6 @@ func (Instance *PathWithSegment) GetToEnd() string {
 	return string(Instance.Body[Instance.Start:])
 }
 
-func (Instance *PathWithSegment) GetLenght() int {
+func (Instance *PathWithSegment) GetLength() int {
 	return Instance.End - Instance.Start
 }

@@ -6,7 +6,7 @@ import (
 	"LiteFrame/Router/Middleware"
 	"LiteFrame/Router/Param"
 	"fmt"
-	"net/http"	
+	"net/http"
 	"sort"
 )
 
@@ -36,12 +36,12 @@ func (Instance *Tree) IsWildCard(Input string) bool {
 
 // IsCatchAll는 입력 문자열이 캐치올 패턴(*path)인지 확인합니다.
 func (Instance *Tree) IsCatchAll(Input string) bool {
-	return len(Input) > 0 && Input[0] == CatchAllPrefix
+	return len(Input) > 0 &&  Input[0] == CatchAllPrefix
 }
 
 // StringToMethodType는 HTTP 메서드 문자열을 MethodType으로 변환합니다.
 // 지원되지 않는 메서드의 경우 NotAllowed를 반환합니다.
-func (Instance  Tree) StringToMethodType(Method string) MethodType {
+func (Instance *Tree) StringToMethodType(Method string) MethodType {
 	switch (Method) {
 		case "GET":
 			return GET
@@ -73,7 +73,7 @@ func (Instance  Tree) StringToMethodType(Method string) MethodType {
 // PathWithSegment 기반으로 최적화된 매칭 알고리즘입니다.
 func (Instance *Tree) Match(SourcePath PathWithSegment, Two string) (bool, int, PathWithSegment) {
 	// PathWithSegment와 문자열 중 짧은 길이를 기준으로 비교 범위 설정
-	Length := SourcePath.GetLenght()
+	Length := SourcePath.GetLength()
 	if Length > len(Two) {
 		Length = len(Two)
 	}
@@ -85,12 +85,12 @@ func (Instance *Tree) Match(SourcePath PathWithSegment, Two string) (bool, int, 
 		}
 	}
 	// PathWithSegment가 Two의 완전한 접두사인지 확인
-	Matched := Index == SourcePath.GetLenght()
+	Matched := Index == SourcePath.GetLength()
 	if Matched {
 		SourcePath.Start = SourcePath.End
 	}
 	// PathWithSegment에서 매칭되지 않은 나머지 부분으로 업데이트
-	if Index < SourcePath.GetLenght() {
+	if Index < SourcePath.GetLength() {
 		SourcePath.Start = SourcePath.Start + Index
 	}
 	return Matched, Index , SourcePath
@@ -262,12 +262,12 @@ func (Instance *Tree) MatchChild(Parent *Node,Child *Node,Path *PathWithSegment,
 			if Err != nil {
 				return true, Err
 			}
-			if Left.GetLenght() > 0 {
+			if Left.GetLength() > 0 {
 				return true, Instance.SetHelper(NewParent, &Left, Method, Handler)
 			}
 			Path.Next()
 			return true, Instance.SetHelper(NewParent, Path, Method, Handler)
-		case MatchingPoint > 0 && MatchingPoint == len(Child.Path) && Path.GetLenght() ==  0:
+		case MatchingPoint > 0 && MatchingPoint == len(Child.Path) && Path.GetLength() ==  0:
 			return true, Instance.SetHelper(Child, &Left, Method, Handler)
 		}
 		return false , nil
@@ -285,7 +285,7 @@ func (Instance *Tree) GetHandler(Request *http.Request) http.HandlerFunc {
 		return Instance.NotAllowedHandler
 	}
 	PathWithSegment.Next()
-	if PathWithSegment.GetLenght() == 0 {
+	if PathWithSegment.GetLength() == 0 {
 		return Instance.SelectHandler(Instance.RootNode, Method,Params)
 	}
 	return Instance.GetHelper(Instance.RootNode, Method, PathWithSegment, Params)
@@ -296,7 +296,7 @@ func (Instance *Tree) GetHandler(Request *http.Request) http.HandlerFunc {
 // 라우팅 우선순위: Static > WildCard > CatchAll (성능과 정확성의 균형)
 func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSegment, Params *Param.Params) http.HandlerFunc {
 	// PathWithSegment가 모두 소비된 경우 현재 노드에서 핸들러 검색
-	if Path.GetLenght()  == 0 {
+	if Path.GetLength()  == 0 {
 		return Instance.SelectHandler(Node,Method,Params)
 	} 
 	// 1순위: Static 자식 노드들에서 첫 번째 바이트 기반 빠른 매칭
@@ -311,7 +311,7 @@ func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSeg
 						Path.Next()
 						return Instance.GetHelper(Node.Children[Index], Method, Path, Params)
 					// 현재 세그먼트가 노드 경로로 시작하고 남은 부분이 있을 때
-					case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLenght() > 0:
+					case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLength() > 0:
 						return Instance.GetHelper(Node.Children[Index], Method, &Left, Params)
 				}
 		}
