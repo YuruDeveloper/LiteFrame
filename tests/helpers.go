@@ -68,11 +68,15 @@ func SetupTreeWithRoutes(routes []RouteConfig) (Tree.Tree, error) {
 // ExecuteRequest는 HTTP 요청을 실행하고 결과를 반환합니다
 func ExecuteRequest(tree Tree.Tree, method, path string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, nil)
-	handlerFunc := tree.GetHandler(req)
+	handlerFunc, params := tree.GetHandler(req, tree.Pool.Get)
 	recorder := httptest.NewRecorder()
 	
 	if handlerFunc != nil {
-		handlerFunc(recorder, req)
+		handlerFunc(recorder, req, params)
+		// 매개변수 객체를 풀에 반환
+		if params != nil {
+			tree.Pool.Put(params)
+		}
 	} else {
 		// GetHandler가 nil을 반환하면 404 응답
 		recorder.WriteHeader(404)

@@ -4,6 +4,8 @@
 *.so
 *.dylib
 
+*.prof
+*.html
 *.test
 *.out
 # Dependency directories (remove the comment below to include it)

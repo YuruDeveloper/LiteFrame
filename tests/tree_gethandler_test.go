@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"LiteFrame/Router/Param"
 	"net/http"
 	"testing"
 )
@@ -101,7 +102,7 @@ func TestGetHandler(t *testing.T) {
 	t.Run("error_handling", func(t *testing.T) {
 		t.Run("not_found", func(t *testing.T) {
 			tree := SetupTree()
-			tree.NotFoundHandler = func(w http.ResponseWriter, r *http.Request) {
+			tree.NotFoundHandler = func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 				w.WriteHeader(http.StatusNotFound)
 				w.Write([]byte("not found"))
 			}
@@ -113,7 +114,7 @@ func TestGetHandler(t *testing.T) {
 
 		t.Run("method_not_allowed", func(t *testing.T) {
 			tree := SetupTree()
-			tree.NotAllowedHandler = func(w http.ResponseWriter, r *http.Request) {
+			tree.NotAllowedHandler = func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				w.Write([]byte("method not allowed"))
 			}

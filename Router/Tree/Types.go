@@ -3,18 +3,19 @@
 package Tree
 
 import (
-	"LiteFrame/Router/Param"
-	"net/http"
+	"LiteFrame/Router/Types"
 )
 
-
-type HandlerFunc func (http.ResponseWriter,*http.Request,*Param.Params)
+// HandlerFunc는 Types 패키지에서 가져온 핸들러 함수 타입입니다.
+type HandlerFunc = Types.HandlerFunc
 
 // NodeType은 트리 노드의 타입을 나타내는 열거형입니다.
 type NodeType uint32
 
 // MethodType은 HTTP 메서드를 나타내는 열거형입니다.
 type MethodType uint32
+
+type ErrorCode string
 
 // NodeType 상수들: 트리 노드의 다양한 타입을 정의합니다.
 const (
@@ -29,7 +30,7 @@ const (
 const (
 	WildCardPrefix = ':' // 와일드카드 매개변수 접두사 (:id, :name 등)
 	CatchAllPrefix = '*' // 캐치올 매개변수 접두사 (*path, *file 등)
-	PathSeparator  = "/" // 경로 구분자
+	PathSeparator  = '/' // 경로 구분자
 )
 
 // HTTP 메서드 상수들: 지원되는 HTTP 메서드들을 정의합니다.
@@ -44,4 +45,8 @@ const (
 	CONNECT           // CONNECT 메서드 - 터널 연결
 	PATCH             // PATCH 메서드 - 데이터 부분 수정
 	NotAllowed        // 지원되지 않는 메서드
+)
+
+const (
+	
 )

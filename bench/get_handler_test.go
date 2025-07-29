@@ -19,7 +19,7 @@ func BenchmarkGetHandler(b *testing.B) {
 			httpReq := CreateBenchRequest(req.Method, req.Path)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 			}
 		})
 	}
@@ -45,7 +45,7 @@ func BenchmarkGetHandler_RouteTypes(b *testing.B) {
 				httpReq := CreateBenchRequest(req.Method, req.Path)
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					tree.GetHandler(httpReq)
+					tree.GetHandler(httpReq, tree.Pool.Get)
 				}
 			})
 		}
@@ -64,7 +64,7 @@ func BenchmarkGetHandler_RouteTypes(b *testing.B) {
 				httpReq := CreateBenchRequest(req.Method, req.Path)
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					tree.GetHandler(httpReq)
+					tree.GetHandler(httpReq, tree.Pool.Get)
 				}
 			})
 		}
@@ -83,7 +83,7 @@ func BenchmarkGetHandler_RouteTypes(b *testing.B) {
 				httpReq := CreateBenchRequest(req.Method, req.Path)
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					tree.GetHandler(httpReq)
+					tree.GetHandler(httpReq, tree.Pool.Get)
 				}
 			})
 		}
@@ -113,7 +113,7 @@ func BenchmarkGetHandler_PathComplexity(b *testing.B) {
 			httpReq := CreateBenchRequest("GET", test.path)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 			}
 		})
 	}
@@ -135,7 +135,7 @@ func BenchmarkGetHandler_HTTPMethods(b *testing.B) {
 			httpReq := CreateBenchRequest(method, path)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 			}
 		})
 	}
@@ -164,7 +164,7 @@ func BenchmarkGetHandler_TreeSize(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 			}
 		})
 	}
@@ -185,7 +185,7 @@ func BenchmarkGetHandler_Concurrent(b *testing.B) {
 			for pb.Next() {
 				req := requests[reqIndex%len(requests)]
 				httpReq := CreateBenchRequest(req.Method, req.Path)
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 				reqIndex++
 			}
 		})
@@ -216,7 +216,7 @@ func BenchmarkGetHandler_Memory(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				tree.GetHandler(httpReq)
+				tree.GetHandler(httpReq, tree.Pool.Get)
 			}
 		})
 	}

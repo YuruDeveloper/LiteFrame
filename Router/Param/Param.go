@@ -7,12 +7,18 @@ import (
 	"sync"
 )
 
+const (
+	DefaultSize = 2
+	MaxSize = 8
+	DefaultBufferSize = 10
+)
+
 // NewParams는 새로운 Params 인스턴스를 생성합니다.
 // 기본 용량 2로 매개변수 리스트를 초기화합니다.
 // 성능 최적화: 대부분의 라우트는 2개 이하의 매개변수를 가지므로 메모리 재할당을 최소화합니다.
 func NewParams() *Params {
 	return &Params{
-		List: make([]Param, 0, 2), // 기본 용량 2: 일반적인 API 패턴에 최적화된 값
+		List: make([]Param, 0, DefaultSize), // 기본 용량 2: 일반적인 API 패턴에 최적화된 값
 	}
 }
 
@@ -71,7 +77,7 @@ func NewParamsPool() *ParamsPool {
 		},
 	}
 	// 수동 웜업: 10개 객체를 미리 생성하여 첫 번째 요청들의 레이턴시 감소
-	for Index := 0; Index < 10  ; Index ++ {
+	for Index := 0; Index < DefaultBufferSize  ; Index ++ {
 		Instance.Put(NewParams())
 	}
 	return Instance
@@ -90,7 +96,7 @@ type ParamsPool struct {
 func (Instance *ParamsPool) Get() *Params {
 	Object := Instance.Pool.Get().(*Params)
 	// 슬라이스 리셋: 기존 메모리를 유지하면서 길이만 0으로 설정 (성능 최적화)
-	Object.List = Object.List[0:0]
+	Object.List = Object.List[:0]
 	return Object
 }
 
@@ -101,8 +107,8 @@ func (Instance *ParamsPool) Put(Object *Params) {
 	if Object != nil {
 		// 메모리 방블론 방지: 용량이 임계값(8)을 초과하면 새 슬라이스 생성
 		// 이는 대량의 매개변수를 가진 요청 후 메모리가 계속 증가하는 것을 방지
-		if cap(Object.List) > 8 {
-			Object.List = make([]Param, 0,2) // 기본 용량으로 리셋
+		if cap(Object.List) > MaxSize {
+			Object.List = make([]Param, 0,DefaultSize) // 기본 용량으로 리셋
 		}
 		Instance.Pool.Put(Object)
 	}

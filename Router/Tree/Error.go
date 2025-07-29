@@ -17,15 +17,6 @@ func (Instance *TreeError) Error() string {
 	return fmt.Sprintf("error: %s From %s", Instance.Message, Instance.Path)
 }
 
-// WithMessage는 동일한 경로를 가지지만 다른 메시지를 가진 새로운 TreeError를 생성합니다.
-// 기존 에러의 경로 정보를 유지하며 메시지만 변경할 때 사용합니다.
-func (Instance *TreeError) WithMessage(message string) error {
-	return &TreeError{
-		Message: message,
-		Path:    Instance.Path,
-	}
-}
-
 // NewTreeError는 새로운 TreeError 인스턴스를 생성합니다.
 // 에러 메시지와 문제가 발생한 경로를 받아 TreeError를 생성합니다.
 func NewTreeError(Message string, path string) error {

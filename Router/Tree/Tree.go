@@ -15,8 +15,8 @@ import (
 type Tree struct {
 	RootNode          *Node                    // 트리의 루트 노드
 	Pool *Param.ParamsPool                    // 매개변수 재사용을 위한 풀
-	NotFoundHandler   http.HandlerFunc        // 404 핸들러
-	NotAllowedHandler http.HandlerFunc        // 405 핸들러  
+	NotFoundHandler   HandlerFunc       // 404 핸들러
+	NotAllowedHandler HandlerFunc        // 405 핸들러  
 	Middlewares       []Middleware.Middleware // 미들웨어 목록
 }
 
@@ -104,19 +104,12 @@ func (Instance *Tree) InsertHandler(Node *Node, Method MethodType, Handler Handl
 // SelectHandler는 노드에서 메서드에 맞는 핸들러를 선택하고 매개변수를 컨텍스트에 주입합니다.
 // 핸들러가 없으면 NotAllowedHandler를 반환합니다.
 // 중요: 메모리 풀 관리와 컨텍스트 주입을 동시에 처리하는 핵심 함수입니다.
-func (Instance *Tree) SelectHandler(Node *Node, Method MethodType,Params *Param.Params) http.HandlerFunc {
+func (Instance *Tree) SelectHandler(Node *Node, Method MethodType) HandlerFunc  {
 	if Handler := Node.Handlers[Method]; Handler != nil {
 		// 클로저를 통해 매개변수를 컨텍스트에 주입하고 메모리 풀 반환 보장
-		return func(Writer http.ResponseWriter, Request *http.Request) {
-			Handler(Writer,Request,Params)
-			// 요청 처리 완료 후 매개변수 객체를 풀에 반환 (메모리 최적화)
-			Instance.Pool.Put(Params)
-		} 
+		return Handler 
 	}
-	
-	// 핸들러가 없는 경우에도 매개변수 객체는 반드시 풀에 반환
-	Instance.Pool.Put(Params)
-	return Instance.NotAllowedHandler
+	return Instance.NotAllowedHandler 
 }
 
 // InsertUniqueTypeChild는 고유한 타입의 자식 노드(WildCard/CatchAll)를 삽입합니다.
@@ -275,29 +268,29 @@ func (Instance *Tree) MatchChild(Parent *Node,Child *Node,Path *PathWithSegment,
 
 // GetHandler는 HTTP 요청에 대응하는 핸들러를 트리에서 찾아 반환합니다.
 // 경로를 분할하고 매개변수를 추출하여 적절한 핸들러를 선택합니다.
-func (Instance *Tree) GetHandler(Request *http.Request) http.HandlerFunc {
+func (Instance *Tree) GetHandler(Request *http.Request,GetParams func() *Param.Params) (HandlerFunc, *Param.Params) {
 	Path := Request.URL.Path
 	Method := Instance.StringToMethodType(Request.Method)
-	Params := Instance.Pool.Get()
+	var Params *Param.Params
 	// PathWithSegment를 사용한 메모리 효율적인 경로 처리
 	PathWithSegment := NewPathWithSegment(Path)
 	if Method == NotAllowed {
-		return Instance.NotAllowedHandler
+		return Instance.NotAllowedHandler , nil
 	}
 	PathWithSegment.Next()
 	if PathWithSegment.GetLength() == 0 {
-		return Instance.SelectHandler(Instance.RootNode, Method,Params)
+		return Instance.SelectHandler(Instance.RootNode, Method) , Params
 	}
-	return Instance.GetHelper(Instance.RootNode, Method, PathWithSegment, Params)
+	return Instance.GetHelper(Instance.RootNode, Method, PathWithSegment,GetParams, Params)
 }
 
 // GetHelper는 GetHandler의 재귀 헬퍼 함수입니다.
 // PathWithSegment를 순회하며 Static, WildCard, CatchAll 노드 순서로 매칭을 시도합니다.
 // 라우팅 우선순위: Static > WildCard > CatchAll (성능과 정확성의 균형)
-func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSegment, Params *Param.Params) http.HandlerFunc {
+func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSegment,GetParams func() *Param.Params, Params *Param.Params) (HandlerFunc , *Param.Params) {
 	// PathWithSegment가 모두 소비된 경우 현재 노드에서 핸들러 검색
 	if Path.GetLength()  == 0 {
-		return Instance.SelectHandler(Node,Method,Params)
+		return Instance.SelectHandler(Node,Method) , Params
 	} 
 	// 1순위: Static 자식 노드들에서 첫 번째 바이트 기반 빠른 매칭
 	for Index , Indice := range []byte(Node.Indices) {
@@ -309,33 +302,38 @@ func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSeg
 					// 완전 매칭: 다음 세그먼트로 진행
 					case Matched:
 						Path.Next()
-						return Instance.GetHelper(Node.Children[Index], Method, Path, Params)
+						return Instance.GetHelper(Node.Children[Index], Method, Path,GetParams, Params)
 					// 현재 세그먼트가 노드 경로로 시작하고 남은 부분이 있을 때
 					case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLength() > 0:
-						return Instance.GetHelper(Node.Children[Index], Method, &Left, Params)
+						return Instance.GetHelper(Node.Children[Index], Method, &Left,GetParams, Params)
 				}
 		}
 	}
 
 	// 2순위: WildCard 노드 매칭 (단일 세그먼트 캡처)
 	if Node.WildCard != nil {
+		if Params == nil {
+			Params = GetParams()
+		}
 		// 현재 세그먼트를 매개변수로 저장하고 다음 세그먼트로 진행
 		Params.Add(Node.WildCard.Param, Path.Get())
 		Path.Next()
-		return Instance.GetHelper(Node.WildCard, Method,Path, Params)
+		return Instance.GetHelper(Node.WildCard, Method,Path,GetParams ,Params)
 	}
 	// 3순위: CatchAll 노드 매칭 (나머지 모든 경로 캡처)
 	if Node.CatchAll != nil {
+		if Params == nil {
+			Params = GetParams()
+		}
 		// PathWithSegment의 나머지 경로를 하나의 매개변수로 저장
 		Params.Add(Node.CatchAll.Param, Path.GetToEnd())
 		Path.Start = Path.End
 		// 빈 경로로 CatchAll 노드에서 핸들러 검색 (경로 소비 완료)
-		return Instance.GetHelper(Node.CatchAll, Method,Path , Params)
+		return Instance.GetHelper(Node.CatchAll, Method,Path , GetParams,Params)
 	}
 
 	// 매칭되는 라우트가 없는 경우 매개변수 객체 반환 후 404 핸들러 반환
-	Instance.Pool.Put(Params)
-	return Instance.NotFoundHandler
+	return Instance.NotFoundHandler , Params
 }
 
 // SetMiddleware는 트리에 미들웨어를 추가합니다.
@@ -346,8 +344,8 @@ func (Instance *Tree) SetMiddleware(Middleware Middleware.Middleware) {
 
 // ApplyMiddleware는 핸들러에 등록된 미들웨어들을 역순으로 적용합니다.
 // 마지막에 등록된 미들웨어가 가장 바깥쪽에 위치하게 됩니다.
-func (Instance *Tree) ApplyMiddleware(Handler http.HandlerFunc) http.Handler{
-	var Temp http.Handler = Handler
+func (Instance *Tree) ApplyMiddleware(Handler HandlerFunc) HandlerFunc{
+	Temp := Handler
 	for Index := len(Instance.Middlewares) -1; Index >= 0; Index-- {
 		Temp = Instance.Middlewares[Index].GetHandler()(Temp)
 	}
@@ -357,5 +355,12 @@ func (Instance *Tree) ApplyMiddleware(Handler http.HandlerFunc) http.Handler{
 // ServeHTTP는 http.Handler 인터페이스를 구현합니다.
 // 요청에 대한 핸들러를 찾아 미들웨어를 적용한 후 실행합니다.
 func (Instance *Tree) ServeHTTP(Writer http.ResponseWriter, Request *http.Request) {
-	Instance.ApplyMiddleware(Instance.GetHandler(Request)).ServeHTTP(Writer,Request)
+	Handler, Params := Instance.GetHandler(Request, Instance.Pool.Get)
+	FinalHandler := Instance.ApplyMiddleware(Handler)
+	FinalHandler(Writer, Request, Params)
+	
+	// 매개변수 객체를 풀에 반환
+	if Params != nil {
+		Instance.Pool.Put(Params)
+	}
 }
