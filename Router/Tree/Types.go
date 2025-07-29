@@ -15,8 +15,6 @@ type NodeType uint32
 // MethodType은 HTTP 메서드를 나타내는 열거형입니다.
 type MethodType uint32
 
-type ErrorCode string
-
 // NodeType 상수들: 트리 노드의 다양한 타입을 정의합니다.
 const (
 	RootType       = iota // 루트 노드 ("/" 경로)
@@ -45,8 +43,4 @@ const (
 	CONNECT           // CONNECT 메서드 - 터널 연결
 	PATCH             // PATCH 메서드 - 데이터 부분 수정
 	NotAllowed        // 지원되지 않는 메서드
-)
-
-const (
-	
 )

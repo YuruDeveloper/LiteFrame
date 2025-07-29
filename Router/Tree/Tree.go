@@ -5,6 +5,7 @@ package Tree
 import (
 	"LiteFrame/Router/Middleware"
 	"LiteFrame/Router/Param"
+	"LiteFrame/Router/Error"
 	"fmt"
 	"net/http"
 	"sort"
@@ -119,7 +120,7 @@ func (Instance *Tree) InsertUniqueTypeChild(Parent *Node,Path string , Target *N
 	switch {
 		// 빈 매개변수명 검증 (":" 또는 "*" 만 있는 경우)
 		case Path[1:] == "":
-			return nil , NewTreeError("Nil Parameter is Not Allowed",Path)
+			return nil , Error.NewErrorWithCode(Error.NilParameter,Path) 
 		// 같은 타입이지만 다른 매개변수명인 경우 충돌 오류
 		case Target != nil && Target.Param != Path[1:]:
 				return nil , ErrorFn(Path)
@@ -141,11 +142,11 @@ func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
 	switch {
 		case Instance.IsWildCard(Path):
 			return Instance.InsertUniqueTypeChild(Parent,Path,Parent.WildCard, WildCardType,
-				func (Path string) error{ return NewTreeError(Path, "Can not Have Two WildCard Node")},
+				func (Path string) error{ return Error.NewErrorWithCode(Error.DuplicateWildCard,Path)},
 				func(Parent, Child *Node) {Parent.WildCard = Child})
 		case Instance.IsCatchAll(Path):
 			return Instance.InsertUniqueTypeChild(Parent,Path,Parent.CatchAll, CatchAllType,
-				func (Path string) error{ return NewTreeError(Path, "Can not Have Two CatchAll Node")},
+				func (Path string) error{ return Error.NewErrorWithCode(Error.DuplicateCatchAll,Path)},
 				func(Parent, Child *Node) {Parent.CatchAll = Child})
 		default:
 			Child := NewNode(StaticType, Path)
@@ -165,7 +166,7 @@ func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Nod
 	Left := Child.Path[:SplitPoint]
 	Right := Child.Path[SplitPoint:]
 	if len(Left) == 0 {
-		return nil , NewTreeError("Splite Failed",Child.Path)
+		return nil , Error.NewErrorWithCode(Error.SplitFailed,Child.Path)
 	}
 	NewParent := NewNode(StaticType, Left)
 	for Index, Target := range Parent.Children {
@@ -189,14 +190,14 @@ func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Nod
 // 경로를 분할하고 필요한 노드들을 생성하거나 기존 노드를 분할합니다.
 func (Instance *Tree) SetHandler(Method string, Path string, Handler HandlerFunc) error {
 	if Method == "" || Path == "" {
-		return NewTreeError(Path, "Invalid Parameters, Path or Method are Required")
+		return Error.NewErrorWithCode(Error.InvalidParameter,Path)
 	}
 	MethodType := Instance.StringToMethodType(Method)
 	if MethodType == NotAllowed {
 		return fmt.Errorf("error : Method %s is not Allowed", Method)
 	}
 	if MethodType != CONNECT && Handler == nil {
-		return NewTreeError(Path, "Invalid Parameter, Handler are Required")
+		return  Error.NewErrorWithCode(Error.InvalidParameter,Path)
 	}
 	// PathWithSegment 구조체를 사용한 효율적인 경로 처리
 	PathWithSegment := NewPathWithSegment(Path)
