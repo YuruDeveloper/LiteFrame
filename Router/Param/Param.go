@@ -46,7 +46,7 @@ func (Instance *Params) Add(Key string, Value string) {
 }
 
 // GetByName은 매개변수 이름으로 해당하는 값을 검색합니다.
-// 매개변수가 찾지 못하면 빈 문자열을 반환합니다.
+// 매개변수를 찾지 못하면 빈 문자열을 반환합니다.
 func (Instance *Params) GetByName(Name string) string {
 	for _, Param := range Instance.List {
 		if Param.Key == Name {
@@ -92,7 +92,7 @@ type ParamsPool struct {
 
 // Get은 풀에서 매개변수 객체를 가져옵니다.
 // 기존 매개변수 리스트를 초기화하여 새로운 요청에서 사용할 수 있도록 준비합니다.
-// 매모리 효율성: 용량은 유지하고 길이만 0으로 리셋하여 재할당 없이 재사용
+// 메모리 효율성: 용량은 유지하고 길이만 0으로 리셋하여 재할당 없이 재사용
 func (Instance *ParamsPool) Get() *Params {
 	Object := Instance.Pool.Get().(*Params)
 	// 슬라이스 리셋: 기존 메모리를 유지하면서 길이만 0으로 설정 (성능 최적화)
@@ -105,7 +105,7 @@ func (Instance *ParamsPool) Get() *Params {
 // 중요한 메모리 관리: 과도한 용량 증가를 방지하여 메모리 풀의 효율성 유지
 func (Instance *ParamsPool) Put(Object *Params) {
 	if Object != nil {
-		// 메모리 방블론 방지: 용량이 임계값(8)을 초과하면 새 슬라이스 생성
+		// 메모리 급증 방지: 용량이 임계값(8)을 초과하면 새 슬라이스 생성
 		// 이는 대량의 매개변수를 가진 요청 후 메모리가 계속 증가하는 것을 방지
 		if cap(Object.List) > MaxSize {
 			Object.List = make([]Param, 0,DefaultSize) // 기본 용량으로 리셋
