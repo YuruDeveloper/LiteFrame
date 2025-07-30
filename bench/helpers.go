@@ -41,7 +41,8 @@ func SetupBenchTreeWithRoutes(routes []BenchRoute) Tree.Tree {
 	tree := Tree.NewTree()
 	
 	for _, route := range routes {
-		tree.SetHandler(route.Method, route.Path, route.Handler)
+		methodType := tree.StringToMethodType(route.Method)
+		tree.SetHandler(methodType, route.Path, route.Handler)
 	}
 	
 	return tree

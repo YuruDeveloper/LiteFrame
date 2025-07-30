@@ -21,7 +21,7 @@ func TestTreeStructure(t *testing.T) {
 		}
 
 		for _, route := range routes {
-			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
@@ -46,7 +46,7 @@ func TestTreeStructure(t *testing.T) {
 		}
 
 		for _, route := range routes {
-			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
@@ -73,7 +73,7 @@ func TestTreeStructure(t *testing.T) {
 		tree := SetupTree()
 		handler := CreateTestHandler()
 
-		err := tree.SetHandler("GET", "/files/*path", handler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/files/*path", handler)
 		AssertNoError(t, err, "SetHandler")
 
 		// 캐치올 구조 검증
@@ -108,7 +108,7 @@ func TestTreeStructure(t *testing.T) {
 		}
 
 		for _, route := range routes {
-			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
@@ -149,7 +149,7 @@ func TestTreeConsistency(t *testing.T) {
 	}
 
 	for _, route := range routes {
-		err := tree.SetHandler(route.Method, route.Path, route.Handler)
+		err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 		AssertNoError(t, err, "SetHandler")
 	}
 
@@ -238,10 +238,10 @@ func TestTreeIntegrity(t *testing.T) {
 		handler2 := CreateHandlerWithResponse("handler2")
 
 		// 같은 경로에 핸들러 두 번 설정
-		err := tree.SetHandler("GET", "/test", handler1)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler1)
 		AssertNoError(t, err, "First SetHandler")
 
-		err = tree.SetHandler("GET", "/test", handler2)
+		err = tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler2)
 		AssertNoError(t, err, "Second SetHandler") // 덮어쓰기 허용
 
 		// 두 번째 핸들러가 설정되었는지 확인
@@ -262,7 +262,7 @@ func TestTreeIntegrity(t *testing.T) {
 		}
 
 		for _, route := range routes {
-			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 

@@ -155,11 +155,13 @@ func BenchmarkGetHandler_TreeSize(b *testing.B) {
 			tree := SetupBenchTree()
 			for i := 0; i < size; i++ {
 				path := generateDynamicPath(i)
-				tree.SetHandler("GET", path, handler)
+				methodType := tree.StringToMethodType("GET")
+			tree.SetHandler(methodType, path, handler)
 			}
 
 			testPath := "/users/123/posts/456"
-			tree.SetHandler("GET", testPath, handler)
+			methodType := tree.StringToMethodType("GET")
+		tree.SetHandler(methodType, testPath, handler)
 			httpReq := CreateBenchRequest("GET", testPath)
 
 			b.ResetTimer()

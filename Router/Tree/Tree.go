@@ -185,154 +185,133 @@ func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Nod
 
 // SetHandler는 지정된 경로와 메서드에 대한 핸들러를 트리에 등록합니다.
 // 경로를 분할하고 필요한 노드들을 생성하거나 기존 노드를 분할합니다.
-func (Instance *Tree) SetHandler(Method string, Path string, Handler HandlerFunc) error {
-	if Method == "" || Path == "" {
-		return Error.NewErrorWithCode(Error.InvalidParameter, Path)
+func (Instance *Tree) SetHandler(Method MethodType, RawPath string, Handler HandlerFunc) error {
+	if RawPath == "" {
+		return Error.NewErrorWithCode(Error.InvalidParameter, RawPath)
 	}
-	MethodType := Instance.StringToMethodType(Method)
-	if MethodType == NotAllowed {
-		return fmt.Errorf("error : Method %s is not Allowed", Method)
+	if Method == NotAllowed {
+		return Error.NewErrorWithCode(Error.MethodNotAllowed,RawPath)
 	}
-	if MethodType != CONNECT && Handler == nil {
-		return Error.NewErrorWithCode(Error.InvalidParameter, Path)
+	if Method != CONNECT && Handler == nil {
+		return Error.NewErrorWithCode(Error.InvalidParameter, RawPath)
 	}
 	// PathWithSegment 구조체를 사용한 효율적인 경로 처리
-	PathWithSegment := NewPathWithSegment(Path)
-	PathWithSegment.Next()
-	if PathWithSegment.IsSame() {
-		Instance.InsertHandler(Instance.RootNode, MethodType, Handler)
-		return nil
-	}
-	return Instance.SetHelper(Instance.RootNode, PathWithSegment, MethodType, Handler)
-}
-
-// SetHelper는 SetHandler의 재귀 헬퍼 함수입니다.
-// PathWithSegment를 순회하며 트리를 구성하고 핸들러를 등록합니다.
-func (Instance *Tree) SetHelper(Parent *Node, Path *PathWithSegment, Method MethodType, Handler HandlerFunc) error {
-	if Path.IsSame() {
-		Instance.InsertHandler(Parent, Method, Handler)
-		return nil
-	}
-	if Ok, Err := Instance.TryMatch(Parent, Path, Method, Handler); Ok {
-		return Err
-	}
-	Child, Err := Instance.InsertChild(Parent, Path.Get())
-	if Err != nil {
-		return Err
-	}
+	Path := NewPathWithSegment(RawPath)
 	Path.Next()
-	return Instance.SetHelper(Child, Path, Method, Handler)
-}
-
-// TryMatch는 부모 노드의 자식들 중에서 현재 경로와 매칭되는 노드를 찾습니다.
-// 매칭되는 자식이 있으면 해당 자식으로 라우팅을 계속합니다.
-func (Instance *Tree) TryMatch(Parent *Node, Path *PathWithSegment, Method MethodType, Handler HandlerFunc) (bool, error) {
-	if len(Parent.Children) == 0 {
-		return false, nil
+	if Path.IsSame() {
+		Instance.InsertHandler(Instance.RootNode, Method, Handler)
+		return nil
 	}
-	for _, Child := range Parent.Children {
-		if Ok, Err := Instance.MatchChild(Parent, Child, Path, Method, Handler); Ok {
-			return Ok, Err
+	Parent := Instance.RootNode
+	GetHelper:
+	for  {
+		if Path.IsSame() {
+			Instance.InsertHandler(Parent,Method,Handler)
+			break
 		}
-	}
-	return false, nil
-}
-
-// MatchChild는 특정 자식 노드와 현재 경로의 매칭을 시도합니다.
-// 완전 매칭, 부분 매칭에 따라 노드 분할이나 라우팅을 수행합니다.
-func (Instance *Tree) MatchChild(Parent *Node, Child *Node, Path *PathWithSegment, Method MethodType, Handler HandlerFunc) (bool, error) {
-	Matched, MatchingPoint, Left := Instance.Match(*Path, Child.Path)
-	switch {
-	case Matched:
-		// 완전 매칭: 원본 Path를 다음 세그먼트로 이동
-		Path.Next()
-		return true, Instance.SetHelper(Child, Path, Method, Handler)
-	case MatchingPoint > 0 && MatchingPoint < len(Child.Path):
-		// 부분 매칭: 노드 분할 필요, 원본 Path는 수정하지 않음
-		NewParent, Err := Instance.SplitNode(Parent, Child, MatchingPoint)
+		ChildrenLength := len(Parent.Children)
+		for Index := 0 ; Index < ChildrenLength ; Index ++ {
+			Matched, MatchingPoint, Left := Instance.Match(*Path, Parent.Children[Index].Path)
+			ChildPathLenght := len(Parent.Children[Index].Path)
+			switch {
+				case Matched:
+					Path.Next()
+					Parent = Parent.Children[Index]
+					continue GetHelper
+				case MatchingPoint > 0 && MatchingPoint < ChildPathLenght:
+					// 부분 매칭: 노드 분할 필요, 원본 Path는 수정하지 않음
+					NewParent, Err := Instance.SplitNode(Parent, Parent.Children[Index], MatchingPoint)
+					if Err != nil {
+						return Err
+					}
+					Parent = NewParent
+					if Left.GetLength() > 0 {
+						Path = &Left
+						continue GetHelper
+					}
+					Path.Next()
+					continue GetHelper
+				case MatchingPoint > 0 && MatchingPoint == ChildPathLenght && Path.GetLength() == 0:
+					Parent = Parent.Children[Index]
+					Path = &Left
+					continue GetHelper
+				default :
+					return nil
+			}	
+		}
+		Child , Err := Instance.InsertChild(Parent,Path.Get())
 		if Err != nil {
-			return true, Err
+			return  Err
 		}
-		if Left.GetLength() > 0 {
-			return true, Instance.SetHelper(NewParent, &Left, Method, Handler)
-		}
+		Parent = Child
 		Path.Next()
-		return true, Instance.SetHelper(NewParent, Path, Method, Handler)
-	case MatchingPoint > 0 && MatchingPoint == len(Child.Path) && Path.GetLength() == 0:
-		return true, Instance.SetHelper(Child, &Left, Method, Handler)
-	}
-	return false, nil
+		continue GetHelper
+	}	
+	return nil
 }
 
 // GetHandler는 HTTP 요청에 대응하는 핸들러를 트리에서 찾아 반환합니다.
 // 경로를 분할하고 매개변수를 추출하여 적절한 핸들러를 선택합니다.
 func (Instance *Tree) GetHandler(Request *http.Request, GetParams func() *Param.Params) (HandlerFunc, *Param.Params) {
-	Path := Request.URL.Path
+	RawPath := Request.URL.Path
 	Method := Instance.StringToMethodType(Request.Method)
 	var Params *Param.Params
 	// PathWithSegment를 사용한 메모리 효율적인 경로 처리
-	PathWithSegment := NewPathWithSegment(Path)
+	Path := NewPathWithSegment(RawPath)
 	if Method == NotAllowed {
 		return Instance.NotAllowedHandler, nil
 	}
-	PathWithSegment.Next()
-	if PathWithSegment.GetLength() == 0 {
-		return Instance.SelectHandler(Instance.RootNode, Method), Params
-	}
-	return Instance.GetHelper(Instance.RootNode, Method, PathWithSegment, GetParams, Params)
-}
+	Path.Next()
+	Node := Instance.RootNode
+	GetHelper:
+	for {
+		if Path.GetLength() == 0 {
+			return Instance.SelectHandler(Node,Method) , Params
+		}
 
-// GetHelper는 GetHandler의 재귀 헬퍼 함수입니다.
-// PathWithSegment를 순회하며 Static, WildCard, CatchAll 노드 순서로 매칭을 시도합니다.
-// 라우팅 우선순위: Static > WildCard > CatchAll (성능과 정확성의 균형)
-func (Instance *Tree) GetHelper(Node *Node, Method MethodType, Path *PathWithSegment, GetParams func() *Param.Params, Params *Param.Params) (HandlerFunc, *Param.Params) {
-	// PathWithSegment가 모두 소비된 경우 현재 노드에서 핸들러 검색
-	if Path.GetLength() == 0 {
-		return Instance.SelectHandler(Node, Method), Params
-	}
-	// 1순위: Static 자식 노드들에서 첫 번째 바이트 기반 빠른 매칭
-	for Index, Indice := range []byte(Node.Indices) {
-		switch Indice {
-		case Path.Body[Path.Start]:
-			// PathWithSegment 복사본으로 매칭하여 부작용 방지
-			Matched, MatchingPoint, Left := Instance.Match(*Path, Node.Children[Index].Path)
-			switch {
-			// 완전 매칭: 다음 세그먼트로 진행
-			case Matched:
-				Path.Next()
-				return Instance.GetHelper(Node.Children[Index], Method, Path, GetParams, Params)
-			// 현재 세그먼트가 노드 경로로 시작하고 남은 부분이 있을 때
-			case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLength() > 0:
-				return Instance.GetHelper(Node.Children[Index], Method, &Left, GetParams, Params)
+		for Index := 0 ; Index < len(Node.Indices) ; Index++ {
+			if Path.Body[Path.Start] == Node.Indices[Index] {
+				Matched, MatchingPoint, Left := Instance.Match(*Path, Node.Children[Index].Path)
+				switch {
+					case Matched:
+						Path.Next()
+						Node = Node.Children[Index]
+						continue GetHelper
+					case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLength() > 0:
+						Node = Node.Children[Index]
+						Path = &Left
+						continue GetHelper
+				}
 			}
 		}
-	}
-
-	// 2순위: WildCard 노드 매칭 (단일 세그먼트 캡처)
-	if Node.WildCard != nil {
-		if Params == nil {
-			Params = GetParams()
+		// 2순위: WildCard 노드 매칭 (단일 세그먼트 캡처)
+		if Node.WildCard != nil {
+			if Params == nil {
+				Params = GetParams()
+			}
+			// 현재 세그먼트를 매개변수로 저장하고 다음 세그먼트로 진행
+			Params.Add(Node.WildCard.Param, Path.Get())
+			Path.Next()
+			Node = Node.WildCard
+			continue GetHelper
 		}
-		// 현재 세그먼트를 매개변수로 저장하고 다음 세그먼트로 진행
-		Params.Add(Node.WildCard.Param, Path.Get())
-		Path.Next()
-		return Instance.GetHelper(Node.WildCard, Method, Path, GetParams, Params)
-	}
-	// 3순위: CatchAll 노드 매칭 (나머지 모든 경로 캡처)
-	if Node.CatchAll != nil {
-		if Params == nil {
-			Params = GetParams()
+		// 3순위: CatchAll 노드 매칭 (나머지 모든 경로 캡처)
+		if Node.CatchAll != nil {
+			if Params == nil {
+				Params = GetParams()
+			}
+			// PathWithSegment의 나머지 경로를 하나의 매개변수로 저장
+			Params.Add(Node.CatchAll.Param, Path.GetToEnd())
+			Path.Start = Path.End
+			// 빈 경로로 CatchAll 노드에서 핸들러 검색 (경로 소비 완료)
+			Node = Node.CatchAll
+			continue GetHelper
 		}
-		// PathWithSegment의 나머지 경로를 하나의 매개변수로 저장
-		Params.Add(Node.CatchAll.Param, Path.GetToEnd())
-		Path.Start = Path.End
-		// 빈 경로로 CatchAll 노드에서 핸들러 검색 (경로 소비 완료)
-		return Instance.GetHelper(Node.CatchAll, Method, Path, GetParams, Params)
+		// 매칭되는 라우트가 없는 경우 매개변수 객체 반환 후 404 핸들러 반환
+		return Instance.NotFoundHandler, Params
 	}
-
-	// 매칭되는 라우트가 없는 경우 매개변수 객체 반환 후 404 핸들러 반환
-	return Instance.NotFoundHandler, Params
 }
+
 
 // SetMiddleware는 트리에 미들웨어를 추가합니다.
 // 추가된 미들웨어는 모든 핸들러에 적용됩니다.

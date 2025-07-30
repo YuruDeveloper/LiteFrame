@@ -366,7 +366,7 @@ func TestSetHandler(t *testing.T) {
 				testHandler = handler
 			}
 
-			err := tree.SetHandler(tc.method, tc.path, testHandler)
+			err := tree.SetHandler(tree.StringToMethodType(tc.method), tc.path, testHandler)
 
 			if tc.valid {
 				AssertNoError(t, err, "SetHandler")
@@ -405,38 +405,38 @@ func TestSplitNode(t *testing.T) {
 }
 
 // ======================
-// 패턴 매칭 테스트
+// 패턴 매칭 테스트 (TryMatch 메서드가 제거되어 주석 처리)
 // ======================
 
-func TestTryMatch(t *testing.T) {
-	tree := SetupTree()
-	handler := CreateTestHandler()
-
-	t.Run("no_children", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
-		pws := Tree.NewPathWithSegment("/users")
-		pws.Next() // 첫 번째 세그먼트로 이동
-
-		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
-		AssertNoError(t, err, "TryMatch")
-
-		if matched {
-			t.Error("Expected no match, got match")
-		}
-	})
-
-	t.Run("exact_match", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
-		child := Tree.NewNode(Tree.StaticType, "users")
-		parent.Children = append(parent.Children, child)
-		pws := Tree.NewPathWithSegment("/users/123")
-		pws.Next() // 첫 번째 세그먼트로 이동
-
-		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
-		AssertNoError(t, err, "TryMatch")
-
-		if !matched {
-			t.Error("Expected match, got no match")
-		}
-	})
-}
+// func TestTryMatch(t *testing.T) {
+// 	tree := SetupTree()
+// 	handler := CreateTestHandler()
+//
+// 	t.Run("no_children", func(t *testing.T) {
+// 		parent := Tree.NewNode(Tree.RootType, "/")
+// 		pws := Tree.NewPathWithSegment("/users")
+// 		pws.Next() // 첫 번째 세그먼트로 이동
+//
+// 		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
+// 		AssertNoError(t, err, "TryMatch")
+//
+// 		if matched {
+// 			t.Error("Expected no match, got match")
+// 		}
+// 	})
+//
+// 	t.Run("exact_match", func(t *testing.T) {
+// 		parent := Tree.NewNode(Tree.RootType, "/")
+// 		child := Tree.NewNode(Tree.StaticType, "users")
+// 		parent.Children = append(parent.Children, child)
+// 		pws := Tree.NewPathWithSegment("/users/123")
+// 		pws.Next() // 첫 번째 세그먼트로 이동
+//
+// 		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
+// 		AssertNoError(t, err, "TryMatch")
+//
+// 		if !matched {
+// 			t.Error("Expected match, got no match")
+// 		}
+// 	})
+// }

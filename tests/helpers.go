@@ -56,7 +56,7 @@ func SetupTreeWithRoutes(routes []RouteConfig) (Tree.Tree, error) {
 	tree := Tree.NewTree()
 
 	for _, route := range routes {
-		err := tree.SetHandler(route.Method, route.Path, route.Handler)
+		err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 		if err != nil {
 			return tree, err
 		}

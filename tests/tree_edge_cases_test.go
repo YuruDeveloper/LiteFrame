@@ -299,11 +299,11 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 		handler2 := CreateHandlerWithResponse("response2")
 
 		// 첫 번째 핸들러 설정
-		err := tree.SetHandler("GET", "/test", handler1)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler1)
 		AssertNoError(t, err, "First SetHandler")
 
 		// 두 번째 핸들러로 덮어쓰기
-		err = tree.SetHandler("GET", "/test", handler2)
+		err = tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler2)
 		AssertNoError(t, err, "Second SetHandler")
 
 		// 두 번째 핸들러가 작동하는지 확인
@@ -323,7 +323,7 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 		}
 		deepPath := "/" + strings.Join(segments, "/")
 
-		err := tree.SetHandler("GET", deepPath, handler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), deepPath, handler)
 		AssertNoError(t, err, "SetHandler with deep path")
 
 		recorder := ExecuteRequest(tree, "GET", deepPath)
@@ -348,7 +348,7 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 
 		for _, route := range routes {
 			t.Run(route.name, func(t *testing.T) {
-				err := tree.SetHandler(route.method, route.path, handler)
+				err := tree.SetHandler(tree.StringToMethodType(route.method), route.path, handler)
 				AssertNoError(t, err, "SetHandler for "+route.path)
 			})
 		}
@@ -420,17 +420,17 @@ func TestInputValidation(t *testing.T) {
 	handler := CreateTestHandler()
 
 	t.Run("invalid_method", func(t *testing.T) {
-		err := tree.SetHandler("", "/test", handler)
+		err := tree.SetHandler(tree.StringToMethodType(""), "/test", handler)
 		AssertError(t, err, "empty method")
 	})
 
 	t.Run("invalid_path", func(t *testing.T) {
-		err := tree.SetHandler("GET", "", handler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "", handler)
 		AssertError(t, err, "empty path")
 	})
 
 	t.Run("nil_handler", func(t *testing.T) {
-		err := tree.SetHandler("GET", "/test", nil)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/test", nil)
 		AssertError(t, err, "nil handler")
 	})
 }

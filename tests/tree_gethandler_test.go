@@ -42,7 +42,7 @@ func TestGetHandler(t *testing.T) {
 				tree := SetupTree()
 				handler := CreateHandlerWithResponse(tc.ExpectedBody)
 
-				err := tree.SetHandler(tc.Method, tc.Path, handler)
+				err := tree.SetHandler(tree.StringToMethodType(tc.Method), tc.Path, handler)
 				AssertNoError(t, err, "SetHandler")
 
 				recorder := ExecuteRequest(tree, tc.Method, tc.Path)
@@ -59,7 +59,7 @@ func TestGetHandler(t *testing.T) {
 			expectedParams := map[string]string{"id": "123"}
 			handler := CreateParamCheckHandler(expectedParams)
 
-			err := tree.SetHandler("GET", "/users/:id", handler)
+			err := tree.SetHandler(tree.StringToMethodType("GET"), "/users/:id", handler)
 			AssertNoError(t, err, "SetHandler")
 
 			recorder := ExecuteRequest(tree, "GET", "/users/123")
@@ -75,7 +75,7 @@ func TestGetHandler(t *testing.T) {
 			}
 			handler := CreateParamCheckHandler(expectedParams)
 
-			err := tree.SetHandler("GET", "/users/:userId/posts/:postId", handler)
+			err := tree.SetHandler(tree.StringToMethodType("GET"), "/users/:userId/posts/:postId", handler)
 			AssertNoError(t, err, "SetHandler")
 
 			recorder := ExecuteRequest(tree, "GET", "/users/123/posts/456")
@@ -90,7 +90,7 @@ func TestGetHandler(t *testing.T) {
 		expectedParams := map[string]string{"path": "static/css/main.css"}
 		handler := CreateParamCheckHandler(expectedParams)
 
-		err := tree.SetHandler("GET", "/files/*path", handler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/files/*path", handler)
 		AssertNoError(t, err, "SetHandler")
 
 		recorder := ExecuteRequest(tree, "GET", "/files/static/css/main.css")
@@ -120,7 +120,7 @@ func TestGetHandler(t *testing.T) {
 			}
 
 			handler := CreateHandlerWithResponse("post response")
-			err := tree.SetHandler("POST", "/users", handler)
+			err := tree.SetHandler(tree.StringToMethodType("POST"), "/users", handler)
 			AssertNoError(t, err, "SetHandler")
 
 			recorder := ExecuteRequest(tree, "GET", "/users")
@@ -143,7 +143,7 @@ func TestGetHandler(t *testing.T) {
 
 		// GET 요청 테스트
 		for _, route := range routes {
-			err := tree.SetHandler(route.Method, route.Path, route.Handler)
+			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler")
 		}
 
@@ -166,11 +166,11 @@ func TestGetHandler(t *testing.T) {
 		wildcardHandler := CreateHandlerWithResponse("wildcard user")
 
 		// 와일드카드 먼저 등록
-		err := tree.SetHandler("GET", "/users/:id", wildcardHandler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), "/users/:id", wildcardHandler)
 		AssertNoError(t, err, "SetHandler wildcard")
 
 		// 정적 라우트 나중에 등록
-		err = tree.SetHandler("GET", "/users/admin", staticHandler)
+		err = tree.SetHandler(tree.StringToMethodType("GET"), "/users/admin", staticHandler)
 		AssertNoError(t, err, "SetHandler static")
 
 		// 정적 라우트가 우선되어야 함
@@ -211,7 +211,7 @@ func TestComplexRouting(t *testing.T) {
 	// 라우트 설정
 	for _, route := range routes {
 		handler := CreateHandlerWithResponse(route.response)
-		err := tree.SetHandler(route.method, route.path, handler)
+		err := tree.SetHandler(tree.StringToMethodType(route.method), route.path, handler)
 		AssertNoError(t, err, "SetHandler for "+route.path)
 	}
 
@@ -247,7 +247,7 @@ func TestAdditionalScenarios(t *testing.T) {
 
 		// 깊은 경로 등록
 		deepPath := "/level1/level2/level3/level4/level5/deep"
-		err := tree.SetHandler("GET", deepPath, handler)
+		err := tree.SetHandler(tree.StringToMethodType("GET"), deepPath, handler)
 		AssertNoError(t, err, "SetHandler for deep path")
 
 		recorder := ExecuteRequest(tree, "GET", deepPath)
@@ -269,7 +269,7 @@ func TestAdditionalScenarios(t *testing.T) {
 		}
 
 		for _, route := range routes {
-			err := tree.SetHandler("GET", route, handler)
+			err := tree.SetHandler(tree.StringToMethodType("GET"), route, handler)
 			AssertNoError(t, err, "SetHandler for route "+route)
 		}
 

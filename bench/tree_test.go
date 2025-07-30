@@ -81,7 +81,8 @@ func BenchmarkSetHandler(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				tree := SetupBenchTree()
-				tree.SetHandler(tc.method, tc.path, handler)
+				methodType := tree.StringToMethodType(tc.method)
+				tree.SetHandler(methodType, tc.path, handler)
 			}
 		})
 	}
@@ -185,7 +186,8 @@ func BenchmarkTreeOperations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree := SetupBenchTree()
 			for _, route := range routes {
-				tree.SetHandler("GET", route, handler)
+				methodType := tree.StringToMethodType("GET")
+				tree.SetHandler(methodType, route, handler)
 			}
 		}
 	})
@@ -223,7 +225,8 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			tree := SetupBenchTree()
-			tree.SetHandler("GET", "/users/:id", handler)
+			methodType := tree.StringToMethodType("GET")
+			tree.SetHandler(methodType, "/users/:id", handler)
 		}
 	})
 
@@ -234,7 +237,8 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree := SetupBenchTree()
 			for _, route := range routes[:5] { // 처음 5개만 사용
-				tree.SetHandler(route.Method, route.Path, route.Handler)
+				methodType := tree.StringToMethodType(route.Method)
+				tree.SetHandler(methodType, route.Path, route.Handler)
 			}
 		}
 	})
