@@ -7,9 +7,10 @@ package Tree
 // 초기 상태에서는 Start와 End가 모두 0으로 설정됩니다.
 func NewPathWithSegment(Path string) *PathWithSegment {
 	return &PathWithSegment{
-		Body: Path,
-		Start:  0,
-		End: 0,
+		Body:    Path,
+		BodyLen: len(Path),
+		Start:   0,
+		End:     0,
 	}
 }
 
@@ -21,14 +22,15 @@ func NewPathWithSegment(Path string) *PathWithSegment {
 // - 반복자 패턴: Next()를 통해 순차적으로 세그먼트 이동
 // - 경계 검사: 안전한 인덱스 접근을 위한 검증 함수들 제공
 type PathWithSegment struct {
-	Body string    // 원본 경로 문자열 (불변)
-	Start int      // 현재 세그먼트의 시작 인덱스
-	End int        // 현재 세그먼트의 끝 인덱스 (exclusive)
+	Body    string // 원본 경로 문자열 (불변)
+	BodyLen int
+	Start   int // 현재 세그먼트의 시작 인덱스
+	End     int // 현재 세그먼트의 끝 인덱스 (exclusive)
 }
 
 // Next는 다음 경로 세그먼트로 이동합니다.
 // 경로 구분자('/')를 건너뛰고 다음 세그먼트의 시작과 끝 인덱스를 설정합니다.
-// 
+//
 // 동작 방식:
 // 1. 현재 End 위치를 새로운 Start로 설정
 // 2. 연속된 '/' 문자들을 건너뛰기
@@ -40,7 +42,7 @@ func (Instance *PathWithSegment) Next() {
 	}
 
 	// 연속된 경로 구분자('/')들을 건너뛰기
-	for len(Instance.Body) > Instance.Start && Instance.Body[Instance.Start] == '/' {
+	for Instance.BodyLen > Instance.Start && Instance.Body[Instance.Start] == '/' {
 		Instance.Start++
 	}
 	if Instance.IsEnd() {
@@ -49,26 +51,30 @@ func (Instance *PathWithSegment) Next() {
 	}
 	// 다음 경로 구분자까지 또는 문자열 끝까지 세그먼트 설정
 	Instance.End = Instance.Start
-	for Instance.End < len(Instance.Body) && Instance.Body[Instance.End] != PathSeparator {
+	for Instance.End < Instance.BodyLen && Instance.Body[Instance.End] != PathSeparator {
 		Instance.End++
 	}
 }
 
 // IsEnd는 경로의 끝에 도달했는지 확인합니다.
 // Start 인덱스가 문자열 길이와 같거나 클 때 true를 반환합니다.
+//
+//go:inline
 func (Instance *PathWithSegment) IsEnd() bool {
-	return  !(Instance.Start < len((Instance.Body)))
+	return Instance.Start >= Instance.BodyLen
 }
 
 // IsSame은 현재 세그먼트가 빈 세그먼트인지 확인합니다.
 // Start와 End가 같을 때 true를 반환합니다. (길이가 0인 세그먼트)
+//
+//go:inline
 func (Instance *PathWithSegment) IsSame() bool {
 	return Instance.Start == Instance.End
 }
 
 // IsNotVaild는 현재 인덱스 상태가 유효하지 않은지 확인합니다.
 // 경로 끝 도달, 인덱스 범위 초과, 논리적 오류를 검사합니다.
-func (Instance *PathWithSegment) IsNotVaild() bool {
+func (Instance *PathWithSegment) IsNotValid() bool {
 	return Instance.IsEnd() || Instance.End > len(Instance.Body) || Instance.Start > Instance.End
 }
 
@@ -76,9 +82,9 @@ func (Instance *PathWithSegment) IsNotVaild() bool {
 // 유효하지 않은 상태일 경우 빈 문자열을 반환합니다.
 // 메모리 할당: 새로운 문자열 생성 (필요한 경우에만 호출)
 func (Instance *PathWithSegment) Get() string {
-	if Instance.IsNotVaild() {
-        return ""
-    }
+	if Instance.IsNotValid() {
+		return ""
+	}
 	return string(Instance.Body[Instance.Start:Instance.End])
 }
 

@@ -54,14 +54,14 @@ func SetupTree() Tree.Tree {
 // SetupTreeWithRoutes는 미리 정의된 라우트들로 트리를 설정합니다
 func SetupTreeWithRoutes(routes []RouteConfig) (Tree.Tree, error) {
 	tree := Tree.NewTree()
-	
+
 	for _, route := range routes {
 		err := tree.SetHandler(route.Method, route.Path, route.Handler)
 		if err != nil {
 			return tree, err
 		}
 	}
-	
+
 	return tree, nil
 }
 
@@ -70,7 +70,7 @@ func ExecuteRequest(tree Tree.Tree, method, path string) *httptest.ResponseRecor
 	req := httptest.NewRequest(method, path, nil)
 	handlerFunc, params := tree.GetHandler(req, tree.Pool.Get)
 	recorder := httptest.NewRecorder()
-	
+
 	if handlerFunc != nil {
 		handlerFunc(recorder, req, params)
 		// 매개변수 객체를 풀에 반환
@@ -82,7 +82,7 @@ func ExecuteRequest(tree Tree.Tree, method, path string) *httptest.ResponseRecor
 		recorder.WriteHeader(404)
 		recorder.WriteString("handler not found")
 	}
-	
+
 	return recorder
 }
 

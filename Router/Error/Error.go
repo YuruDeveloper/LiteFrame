@@ -11,26 +11,26 @@ type ErrorCode uint32
 // 에러 코드 상수들: 카테고리별로 1000 단위로 구분하여 관리합니다.
 const (
 	// 일반적인 매개변수 및 입력 검증 에러 (1000번대)
-	InvalidParameter ErrorCode = iota + 1000  // 잘못된 매개변수
-	NilParameter                              // nil 또는 빈 매개변수
-	InvalidMethod                             // 지원되지 않는 HTTP 메서드
-	InvalidHandler                            // 잘못된 핸들러 함수
-	
+	InvalidParameter ErrorCode = iota + 1000 // 잘못된 매개변수
+	NilParameter                             // nil 또는 빈 매개변수
+	InvalidMethod                            // 지원되지 않는 HTTP 메서드
+	InvalidHandler                           // 잘못된 핸들러 함수
+
 	// 트리 구조 관련 에러 (2000번대)
 	SplitFailed       ErrorCode = iota + 2000 // 노드 분할 실패
 	NodeNotFound                              // 노드를 찾을 수 없음
 	PathTooLong                               // 경로가 너무 긴 경우
 	InvalidSplitPoint                         // 잘못된 분할 지점
-	
+
 	// 라우트 충돌 에러 (3000번대)
 	DuplicateWildCard ErrorCode = iota + 3000 // 중복된 와일드카드 노드
 	DuplicateCatchAll                         // 중복된 캐치올 노드
 	ConflictingRoute                          // 기존 라우트와 충돌
-	
-	// 런타임 에러 (4000번대)  
-	HandlerNotFound   ErrorCode = iota + 4000 // 핸들러를 찾을 수 없음
-	MethodNotAllowed                          // 허용되지 않는 HTTP 메서드
-	ParameterMissing                          // 필수 매개변수 누락
+
+	// 런타임 에러 (4000번대)
+	HandlerNotFound  ErrorCode = iota + 4000 // 핸들러를 찾을 수 없음
+	MethodNotAllowed                         // 허용되지 않는 HTTP 메서드
+	ParameterMissing                         // 필수 매개변수 누락
 )
 
 // LiteFrameError는 LiteFrame에서 발생하는 구조화된 에러를 나타내는 구조체입니다.
@@ -70,7 +70,7 @@ func GetErrorMessage(code ErrorCode) string {
 		return "HTTP method is not supported"
 	case InvalidHandler:
 		return "Handler function is required"
-	
+
 	// Tree structure errors
 	case SplitFailed:
 		return "Failed to split node"
@@ -80,7 +80,7 @@ func GetErrorMessage(code ErrorCode) string {
 		return "Path exceeds maximum length"
 	case InvalidSplitPoint:
 		return "Split point is out of range"
-	
+
 	// Route conflicts
 	case DuplicateWildCard:
 		return "Cannot have duplicate wildcard nodes"
@@ -88,7 +88,7 @@ func GetErrorMessage(code ErrorCode) string {
 		return "Cannot have duplicate catch-all nodes"
 	case ConflictingRoute:
 		return "Route conflicts with existing route"
-	
+
 	// Runtime errors
 	case HandlerNotFound:
 		return "Handler not found for route"
@@ -96,7 +96,7 @@ func GetErrorMessage(code ErrorCode) string {
 		return "HTTP method not allowed"
 	case ParameterMissing:
 		return "Required parameter is missing"
-	
+
 	default:
 		return "Unknown error"
 	}

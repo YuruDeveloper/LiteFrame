@@ -256,8 +256,8 @@ func TestTreeIntegrity(t *testing.T) {
 
 		// 충돌 가능한 경로들
 		routes := []RouteConfig{
-			{"GET", "/users/admin", handler},  // 정적
-			{"GET", "/users/:id", handler},    // 와일드카드
+			{"GET", "/users/admin", handler},    // 정적
+			{"GET", "/users/:id", handler},      // 와일드카드
 			{"GET", "/users/:id/edit", handler}, // 와일드카드 + 정적
 		}
 

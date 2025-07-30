@@ -41,7 +41,7 @@ func TestGetHandler(t *testing.T) {
 			t.Run(tc.Name, func(t *testing.T) {
 				tree := SetupTree()
 				handler := CreateHandlerWithResponse(tc.ExpectedBody)
-				
+
 				err := tree.SetHandler(tc.Method, tc.Path, handler)
 				AssertNoError(t, err, "SetHandler")
 
@@ -132,7 +132,7 @@ func TestGetHandler(t *testing.T) {
 	// HTTP 메서드 테스트
 	t.Run("multiple_methods", func(t *testing.T) {
 		tree := SetupTree()
-		
+
 		routes := []RouteConfig{
 			{"GET", "/users", CreateHandlerWithResponse("GET response")},
 			{"POST", "/users", CreateHandlerWithResponse("POST response")},
@@ -161,14 +161,14 @@ func TestGetHandler(t *testing.T) {
 	// 라우팅 우선순위 테스트
 	t.Run("routing_priority", func(t *testing.T) {
 		tree := SetupTree()
-		
+
 		staticHandler := CreateHandlerWithResponse("static admin")
 		wildcardHandler := CreateHandlerWithResponse("wildcard user")
-		
+
 		// 와일드카드 먼저 등록
 		err := tree.SetHandler("GET", "/users/:id", wildcardHandler)
 		AssertNoError(t, err, "SetHandler wildcard")
-		
+
 		// 정적 라우트 나중에 등록
 		err = tree.SetHandler("GET", "/users/admin", staticHandler)
 		AssertNoError(t, err, "SetHandler static")
@@ -191,7 +191,7 @@ func TestGetHandler(t *testing.T) {
 
 func TestComplexRouting(t *testing.T) {
 	tree := SetupTree()
-	
+
 	// 복잡한 라우트 구성
 	routes := []struct {
 		method   string

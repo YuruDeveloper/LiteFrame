@@ -63,7 +63,7 @@ func TestPathWithSegment(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pws := Tree.NewPathWithSegment(tc.input)
 			var result []string
-			
+
 			for {
 				pws.Next()
 				if pws.IsSame() {
@@ -74,7 +74,7 @@ func TestPathWithSegment(t *testing.T) {
 					result = append(result, segment)
 				}
 			}
-			
+
 			if len(result) != len(tc.expected) {
 				t.Errorf("Expected length %d, got %d for path '%s'", len(tc.expected), len(result), tc.input)
 				t.Errorf("Expected: %v, Got: %v", tc.expected, result)
@@ -110,7 +110,7 @@ func TestIsWildCard(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			result := tree.IsWildCard(tc.Input)
 			expected := tc.Expected.(bool)
-			
+
 			if result != expected {
 				t.Errorf("IsWildCard(%q) = %v, expected %v", tc.Input, result, expected)
 			}
@@ -138,7 +138,7 @@ func TestIsCatchAll(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			result := tree.IsCatchAll(tc.Input)
 			expected := tc.Expected.(bool)
-			
+
 			if result != expected {
 				t.Errorf("IsCatchAll(%q) = %v, expected %v", tc.Input, result, expected)
 			}
@@ -206,9 +206,9 @@ func TestMatch(t *testing.T) {
 				pws = Tree.NewPathWithSegment("/" + tc.One)
 				pws.Next() // 첫 번째 세그먼트로 이동
 			}
-			
+
 			matched, index, leftPws := tree.Match(*pws, tc.Two)
-			
+
 			// Match 후 남은 부분을 Get()으로 가져오기
 			left := leftPws.Get()
 
@@ -251,7 +251,7 @@ func TestInsertHandler(t *testing.T) {
 
 	t.Run("invalid_method", func(t *testing.T) {
 		methodType := tree.StringToMethodType("INVALID")
-		
+
 		if methodType != Tree.NotAllowed {
 			t.Error("Expected NotAllowed method type for invalid method")
 		}
@@ -270,7 +270,7 @@ func TestInsertChild(t *testing.T) {
 		child, err := tree.InsertChild(parent, "users")
 
 		AssertNoError(t, err, "InsertChild")
-		
+
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
@@ -287,7 +287,7 @@ func TestInsertChild(t *testing.T) {
 		child, err := tree.InsertChild(parent, ":id")
 
 		AssertNoError(t, err, "InsertChild wildcard")
-		
+
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
@@ -307,7 +307,7 @@ func TestInsertChild(t *testing.T) {
 		child, err := tree.InsertChild(parent, "*files")
 
 		AssertNoError(t, err, "InsertChild catch-all")
-		
+
 		if child == nil {
 			t.Error("Expected child node, got nil")
 		}
@@ -323,14 +323,14 @@ func TestInsertChild(t *testing.T) {
 		// 중복 와일드카드 테스트
 		parent := Tree.NewNode(Tree.RootType, "/")
 		parent.WildCard = Tree.NewNode(Tree.WildCardType, ":existing")
-		
+
 		_, err := tree.InsertChild(parent, ":id")
 		AssertError(t, err, "duplicate wildcard")
 
 		// 중복 캐치올 테스트
 		parent2 := Tree.NewNode(Tree.RootType, "/")
 		parent2.CatchAll = Tree.NewNode(Tree.CatchAllType, "*existing")
-		
+
 		_, err = tree.InsertChild(parent2, "*files")
 		AssertError(t, err, "duplicate catch-all")
 	})
@@ -365,9 +365,9 @@ func TestSetHandler(t *testing.T) {
 			if tc.valid {
 				testHandler = handler
 			}
-			
+
 			err := tree.SetHandler(tc.method, tc.path, testHandler)
-			
+
 			if tc.valid {
 				AssertNoError(t, err, "SetHandler")
 			} else {
@@ -419,7 +419,7 @@ func TestTryMatch(t *testing.T) {
 
 		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
 		AssertNoError(t, err, "TryMatch")
-		
+
 		if matched {
 			t.Error("Expected no match, got match")
 		}
@@ -434,7 +434,7 @@ func TestTryMatch(t *testing.T) {
 
 		matched, err := tree.TryMatch(parent, pws, Tree.GET, handler)
 		AssertNoError(t, err, "TryMatch")
-		
+
 		if !matched {
 			t.Error("Expected match, got no match")
 		}

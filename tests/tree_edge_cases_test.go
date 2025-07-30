@@ -67,7 +67,7 @@ func TestEdgeCases_Match(t *testing.T) {
 				pws = Tree.NewPathWithSegment("/" + tc.One)
 				pws.Next() // 첫 번째 세그먼트로 이동
 			}
-			
+
 			matched, index, left := tree.Match(*pws, tc.Two)
 			remaining := left.Get()
 
@@ -107,7 +107,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 				// PathWithSegment로 변환하여 테스트
 				pws := Tree.NewPathWithSegment(tc.input)
 				var result []string
-				
+
 				for {
 					pws.Next()
 					if pws.IsSame() {
@@ -118,7 +118,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 						result = append(result, segment)
 					}
 				}
-				
+
 				if len(result) != len(tc.expected) {
 					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 					return
@@ -150,7 +150,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 				// PathWithSegment로 변환하여 테스트
 				pws := Tree.NewPathWithSegment(tc.input)
 				var result []string
-				
+
 				for {
 					pws.Next()
 					if pws.IsSame() {
@@ -161,7 +161,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 						result = append(result, segment)
 					}
 				}
-				
+
 				if len(result) != len(tc.expected) {
 					t.Errorf("Expected length %d, got %d", len(tc.expected), len(result))
 					return
@@ -227,7 +227,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		// 첫 번째 와일드카드 성공
 		child1, err1 := tree.InsertChild(parent, ":id")
 		AssertNoError(t, err1, "First wildcard insertion")
-		
+
 		if child1 == nil {
 			t.Error("First wildcard child is nil")
 		}
@@ -235,7 +235,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		// 두 번째 와일드카드 실패해야 함
 		child2, err2 := tree.InsertChild(parent, ":name")
 		AssertError(t, err2, "duplicate wildcard")
-		
+
 		if child2 != nil {
 			t.Error("Expected nil child for duplicate wildcard")
 		}
@@ -247,7 +247,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		// 첫 번째 캐치올 성공
 		child1, err1 := tree.InsertChild(parent, "*files")
 		AssertNoError(t, err1, "First catch-all insertion")
-		
+
 		if child1 == nil {
 			t.Error("First catch-all child is nil")
 		}
@@ -255,7 +255,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 		// 두 번째 캐치올 실패해야 함
 		child2, err2 := tree.InsertChild(parent, "*documents")
 		AssertError(t, err2, "duplicate catch-all")
-		
+
 		if child2 != nil {
 			t.Error("Expected nil child for duplicate catch-all")
 		}
@@ -397,13 +397,13 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// 에러 케이스 테스트 - split_at_start는 Left가 빈 문자열이 되어 에러 발생해야 함
 	t.Run("split_at_start_error", func(t *testing.T) {
 		parent := Tree.NewNode(Tree.RootType, "/")
 		child := Tree.NewNode(Tree.StaticType, "users")
 		parent.Children = append(parent.Children, child)
-		
+
 		_, err := tree.SplitNode(parent, child, 0)
 		if err == nil {
 			t.Error("Expected error for split at start (Left would be empty), got nil")

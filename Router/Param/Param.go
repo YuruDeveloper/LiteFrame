@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DefaultSize = 2
-	MaxSize = 8
+	DefaultSize       = 2
+	MaxSize           = 8
 	DefaultBufferSize = 10
 )
 
@@ -68,21 +68,20 @@ func GetParamsFromCTX(Context context.Context) (*Params, bool) {
 // 초기에 10개의 매개변수 객체를 미리 할당하여 풀에 넣어둡니다.
 // 웜업 예열(Warm-up): 초기 요청에서의 메모리 할당 지연을 방지합니다.
 func NewParamsPool() *ParamsPool {
-	Instance :=  &ParamsPool{
-		Pool : &sync.Pool {
+	Instance := &ParamsPool{
+		Pool: &sync.Pool{
 			// Factory 함수: 풀이 비어있을 때 새로운 객체를 생성
 			New: func() any {
 				return NewParams()
-			}, 
+			},
 		},
 	}
 	// 수동 웜업: 10개 객체를 미리 생성하여 첫 번째 요청들의 레이턴시 감소
-	for Index := 0; Index < DefaultBufferSize  ; Index ++ {
+	for Index := 0; Index < DefaultBufferSize; Index++ {
 		Instance.Put(NewParams())
 	}
 	return Instance
 }
-
 
 // ParamsPool은 Params 객체를 재사용하기 위한 풀 구조체입니다.
 // 메모리 할당과 가비지 컨렉션 오버헤드를 줄이기 위해 sync.Pool을 사용합니다.
@@ -108,7 +107,7 @@ func (Instance *ParamsPool) Put(Object *Params) {
 		// 메모리 급증 방지: 용량이 임계값(8)을 초과하면 새 슬라이스 생성
 		// 이는 대량의 매개변수를 가진 요청 후 메모리가 계속 증가하는 것을 방지
 		if cap(Object.List) > MaxSize {
-			Object.List = make([]Param, 0,DefaultSize) // 기본 용량으로 리셋
+			Object.List = make([]Param, 0, DefaultSize) // 기본 용량으로 리셋
 		}
 		Instance.Pool.Put(Object)
 	}

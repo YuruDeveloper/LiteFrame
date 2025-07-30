@@ -10,15 +10,16 @@ import (
 // 모든 미들웨어는 MiddleWareFunc을 반환하는 GetHandler 메서드를 구현해야 합니다.
 //
 // 사용 예시:
-//   type LoggingMiddleware struct{}
-//   func (m LoggingMiddleware) GetHandler() MiddleWareFunc {
-//       return func(next http.Handler) http.Handler {
-//           return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//               log.Printf("Request: %s %s", r.Method, r.URL.Path)
-//               next.ServeHTTP(w, r)
-//           })
-//       }
-//   }
+//
+//	type LoggingMiddleware struct{}
+//	func (m LoggingMiddleware) GetHandler() MiddleWareFunc {
+//	    return func(next http.Handler) http.Handler {
+//	        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	            log.Printf("Request: %s %s", r.Method, r.URL.Path)
+//	            next.ServeHTTP(w, r)
+//	        })
+//	    }
+//	}
 type Middleware interface {
 	GetHandler() MiddleWareFunc // 미들웨어 함수를 반환하는 메서드
 }
