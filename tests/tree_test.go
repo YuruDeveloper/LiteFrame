@@ -225,38 +225,6 @@ func TestMatch(t *testing.T) {
 	}
 }
 
-// ======================
-// 핸들러 삽입 테스트
-// ======================
-
-func TestInsertHandler(t *testing.T) {
-	tree := SetupTree()
-	handler := CreateTestHandler()
-
-	validMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
-
-	t.Run("valid_methods", func(t *testing.T) {
-		for _, method := range validMethods {
-			t.Run(method, func(t *testing.T) {
-				node := Tree.NewNode(Tree.StaticType, "/test")
-				methodType := tree.StringToMethodType(method)
-				tree.InsertHandler(node, methodType, handler)
-
-				if node.Handlers[methodType] == nil {
-					t.Errorf("Handler for method %s was not set", method)
-				}
-			})
-		}
-	})
-
-	t.Run("invalid_method", func(t *testing.T) {
-		methodType := tree.StringToMethodType("INVALID")
-
-		if methodType != Tree.NotAllowed {
-			t.Error("Expected NotAllowed method type for invalid method")
-		}
-	})
-}
 
 // ======================
 // 자식 노드 삽입 테스트

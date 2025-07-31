@@ -149,8 +149,14 @@ func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
 	default:
 		Child := NewNode(StaticType, Path)
 		InsertLocation := sort.Search(len(Parent.Indices), func(Index int) bool { return Parent.Indices[Index] >= Path[0] })
-		Parent.Indices = append(Parent.Indices[:InsertLocation], append([]byte{Path[0]}, Parent.Indices[InsertLocation:]...)...)
-		Parent.Children = append(Parent.Children[:InsertLocation], append([]*Node{Child}, Parent.Children[InsertLocation:]...)...)
+		
+		Parent.Indices = append(Parent.Indices, 0)
+      	copy(Parent.Indices[InsertLocation+1:], Parent.Indices[InsertLocation:])
+      	Parent.Indices[InsertLocation] = Path[0]
+
+      	Parent.Children = append(Parent.Children, nil)
+      	copy(Parent.Children[InsertLocation+1:], Parent.Children[InsertLocation:])
+      	Parent.Children[InsertLocation] = Child
 		return Child, nil
 	}
 }
@@ -342,7 +348,7 @@ func (Instance *Tree) CompileMiddlewares() {
 		for Index := len(Instance.Middlewares) -1; Index> -1 ; Index-- {
 			Temp = Instance.Middlewares[Index].GetHandler()(Temp)
 		}
-		return BaseHandler
+		return Temp
 	}
 }
 
@@ -360,9 +366,7 @@ func (Instance *Tree) ApplyMiddleware(Handler HandlerFunc) HandlerFunc {
 // 요청에 대한 핸들러를 찾아 미들웨어를 적용한 후 실행합니다.
 func (Instance *Tree) ServeHTTP(Writer http.ResponseWriter, Request *http.Request) {
 	Handler, Params := Instance.GetHandler(Request, Instance.Pool.Get)
-	if Instance.CompiledMiddleware != nil {
-		Handler = Instance.CompiledMiddleware(Handler)
-	}
+	Handler = Instance.ApplyMiddleware(Handler)
 	Handler(Writer, Request, Params)
 
 	// 매개변수 객체를 풀에 반환
