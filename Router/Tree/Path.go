@@ -72,7 +72,7 @@ func (Instance *PathWithSegment) IsSame() bool {
 	return Instance.Start == Instance.End
 }
 
-// IsNotVaild는 현재 인덱스 상태가 유효하지 않은지 확인합니다.
+// IsNotValid는 현재 인덱스 상태가 유효하지 않은지 확인합니다.
 // 경로 끝 도달, 인덱스 범위 초과, 논리적 오류를 검사합니다.
 func (Instance *PathWithSegment) IsNotValid() bool {
 	return Instance.IsEnd() || Instance.End > len(Instance.Body) || Instance.Start > Instance.End
