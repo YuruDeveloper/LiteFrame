@@ -1,32 +1,31 @@
-package tests
+package Tree
 
 import (
 	"LiteFrame/Router/Param"
-	"LiteFrame/Router/Tree"
 	"net/http"
 	"net/http/httptest"
 )
 
 // ====================
-// 공통 Helper 함수들
+// Common Helper Functions
 // ====================
 
-// CreateTestHandler는 기본 테스트 핸들러를 생성합니다
-func CreateTestHandler() Tree.HandlerFunc {
+// CreateTestHandler creates a basic test handler
+func CreateTestHandler() HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-// CreateHandlerWithResponse는 지정된 응답을 반환하는 테스트 핸들러를 생성합니다
-func CreateHandlerWithResponse(response string) Tree.HandlerFunc {
+// CreateHandlerWithResponse creates a test handler that returns specified response
+func CreateHandlerWithResponse(response string) HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 		w.Write([]byte(response))
 	}
 }
 
-// CreateParamCheckHandler는 매개변수를 검증하는 테스트 핸들러를 생성합니다
-func CreateParamCheckHandler(expectedParams map[string]string) Tree.HandlerFunc {
+// CreateParamCheckHandler creates a test handler that validates parameters
+func CreateParamCheckHandler(expectedParams map[string]string) HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 		for key, expectedValue := range expectedParams {
 			actualValue := params.GetByName(key)
@@ -43,17 +42,17 @@ func CreateParamCheckHandler(expectedParams map[string]string) Tree.HandlerFunc 
 }
 
 // ====================
-// 테스트 도우미 함수들
+// Test Helper Functions
 // ====================
 
-// SetupTree는 기본 트리를 생성하고 반환합니다
-func SetupTree() Tree.Tree {
-	return Tree.NewTree()
+// SetupTree creates and returns a basic tree
+func SetupTree() Tree {
+	return NewTree()
 }
 
 // SetupTreeWithRoutes는 미리 정의된 라우트들로 트리를 설정합니다
-func SetupTreeWithRoutes(routes []RouteConfig) (Tree.Tree, error) {
-	tree := Tree.NewTree()
+func SetupTreeWithRoutes(routes []RouteConfig) (Tree, error) {
+	tree := NewTree()
 
 	for _, route := range routes {
 		err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
@@ -66,7 +65,7 @@ func SetupTreeWithRoutes(routes []RouteConfig) (Tree.Tree, error) {
 }
 
 // ExecuteRequest는 HTTP 요청을 실행하고 결과를 반환합니다
-func ExecuteRequest(tree Tree.Tree, method, path string) *httptest.ResponseRecorder {
+func ExecuteRequest(tree Tree, method, path string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, nil)
 	handlerFunc, params := tree.GetHandler(req, tree.Pool.Get)
 	recorder := httptest.NewRecorder()
@@ -94,7 +93,7 @@ func ExecuteRequest(tree Tree.Tree, method, path string) *httptest.ResponseRecor
 type RouteConfig struct {
 	Method  string
 	Path    string
-	Handler Tree.HandlerFunc
+	Handler HandlerFunc
 }
 
 // TestCase는 일반적인 테스트 케이스를 정의합니다

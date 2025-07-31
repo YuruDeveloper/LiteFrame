@@ -1,4 +1,4 @@
-package tests
+package Tree
 
 import (
 	"LiteFrame/Router/Param"
@@ -7,11 +7,11 @@ import (
 )
 
 // ======================
-// GetHandler 기능 테스트
+// GetHandler Functionality Tests
 // ======================
 
 func TestGetHandler(t *testing.T) {
-	// 기본 핸들러 경로 테스트
+	// Basic handler path tests
 	t.Run("basic_paths", func(t *testing.T) {
 		testCases := []HTTPTestCase{
 			{

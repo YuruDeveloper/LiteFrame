@@ -1,12 +1,11 @@
-package tests
+package Tree
 
 import (
-	"LiteFrame/Router/Tree"
 	"testing"
 )
 
 // ======================
-// 트리 구조 검증 테스트
+// Tree Structure Validation Tests
 // ======================
 
 func TestTreeStructure(t *testing.T) {
@@ -25,8 +24,8 @@ func TestTreeStructure(t *testing.T) {
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
-		// 루트 구조 검증
-		if tree.RootNode.Type != Tree.RootType {
+		// Validate root structure
+		if tree.RootNode.Type != RootType {
 			t.Error("Root node type mismatch")
 		}
 
@@ -50,7 +49,7 @@ func TestTreeStructure(t *testing.T) {
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
-		// 와일드카드 구조 검증
+		// Validate wildcard structure
 		usersNode := findChildNode(tree.RootNode, "users")
 		if usersNode == nil {
 			t.Fatal("Users node not found")
@@ -60,7 +59,7 @@ func TestTreeStructure(t *testing.T) {
 			t.Error("Wildcard child not found")
 		}
 
-		if usersNode.WildCard.Type != Tree.WildCardType {
+		if usersNode.WildCard.Type != WildCardType {
 			t.Error("Wildcard node type mismatch")
 		}
 
@@ -86,7 +85,7 @@ func TestTreeStructure(t *testing.T) {
 			t.Error("CatchAll child not found")
 		}
 
-		if filesNode.CatchAll.Type != Tree.CatchAllType {
+		if filesNode.CatchAll.Type != CatchAllType {
 			t.Error("CatchAll node type mismatch")
 		}
 
@@ -113,7 +112,7 @@ func TestTreeStructure(t *testing.T) {
 		}
 
 		// 기본 구조 검증
-		if tree.RootNode.Handlers[Tree.GET] == nil {
+		if tree.RootNode.Handlers[GET] == nil {
 			t.Error("Root handler not set")
 		}
 
@@ -158,7 +157,7 @@ func TestTreeConsistency(t *testing.T) {
 			t.Error("Root node is nil")
 		}
 
-		if tree.RootNode.Type != Tree.RootType {
+		if tree.RootNode.Type != RootType {
 			t.Error("Root node type mismatch")
 		}
 
@@ -177,7 +176,7 @@ func TestTreeConsistency(t *testing.T) {
 // ======================
 
 // findChildNode는 자식 노드들 중에서 지정된 경로를 가진 노드를 찾습니다
-func findChildNode(parent *Tree.Node, path string) *Tree.Node {
+func findChildNode(parent *Node, path string) *Node {
 	for _, child := range parent.Children {
 		if child.Path == path {
 			return child
@@ -187,7 +186,7 @@ func findChildNode(parent *Tree.Node, path string) *Tree.Node {
 }
 
 // checkNodeConsistency는 노드의 일관성을 재귀적으로 확인합니다
-func checkNodeConsistency(t *testing.T, node *Tree.Node, path string) {
+func checkNodeConsistency(t *testing.T, node *Node, path string) {
 	if node == nil {
 		t.Errorf("Node at path %s is nil", path)
 		return

@@ -1,15 +1,14 @@
-package tests
+package Tree
 
 import (
 	"LiteFrame/Router/Param"
-	"LiteFrame/Router/Tree"
 	"net/http"
 	"strings"
 	"testing"
 )
 
 // ======================
-// 경계값 및 엣지 케이스 테스트
+// Edge Cases and Boundary Tests
 // ======================
 
 func TestEdgeCases_Match(t *testing.T) {
@@ -60,11 +59,11 @@ func TestEdgeCases_Match(t *testing.T) {
 			}()
 
 			// PathWithSegment 생성
-			var pws *Tree.PathWithSegment
+			var pws *PathWithSegment
 			if tc.One == "" {
-				pws = Tree.NewPathWithSegment("")
+				pws = NewPathWithSegment("")
 			} else {
-				pws = Tree.NewPathWithSegment("/" + tc.One)
+				pws = NewPathWithSegment("/" + tc.One)
 				pws.Next() // 첫 번째 세그먼트로 이동
 			}
 
@@ -105,7 +104,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				// PathWithSegment로 변환하여 테스트
-				pws := Tree.NewPathWithSegment(tc.input)
+				pws := NewPathWithSegment(tc.input)
 				var result []string
 
 				for {
@@ -148,7 +147,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				// PathWithSegment로 변환하여 테스트
-				pws := Tree.NewPathWithSegment(tc.input)
+				pws := NewPathWithSegment(tc.input)
 				var result []string
 
 				for {
@@ -222,7 +221,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 	tree := SetupTree()
 
 	t.Run("duplicate_wildcard_error", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
+		parent := NewNode(RootType, "/")
 
 		// 첫 번째 와일드카드 성공
 		child1, err1 := tree.InsertChild(parent, ":id")
@@ -242,7 +241,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 	})
 
 	t.Run("duplicate_catchall_error", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
+		parent := NewNode(RootType, "/")
 
 		// 첫 번째 캐치올 성공
 		child1, err1 := tree.InsertChild(parent, "*files")
@@ -275,7 +274,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				parent := Tree.NewNode(Tree.RootType, "/")
+				parent := NewNode(RootType, "/")
 				child, err := tree.InsertChild(parent, tc.path)
 
 				AssertNoError(t, err, "InsertChild")
@@ -376,8 +375,8 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			parent := Tree.NewNode(Tree.RootType, "/")
-			child := Tree.NewNode(Tree.StaticType, tc.originalPath)
+			parent := NewNode(RootType, "/")
+			child := NewNode(StaticType, tc.originalPath)
 			parent.Children = append(parent.Children, child)
 
 			newNode, err := tree.SplitNode(parent, child, tc.splitPoint)
@@ -400,8 +399,8 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 
 	// 에러 케이스 테스트 - split_at_start는 Left가 빈 문자열이 되어 에러 발생해야 함
 	t.Run("split_at_start_error", func(t *testing.T) {
-		parent := Tree.NewNode(Tree.RootType, "/")
-		child := Tree.NewNode(Tree.StaticType, "users")
+		parent := NewNode(RootType, "/")
+		child := NewNode(StaticType, "users")
 		parent.Children = append(parent.Children, child)
 
 		_, err := tree.SplitNode(parent, child, 0)

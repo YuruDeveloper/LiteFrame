@@ -16,14 +16,14 @@ type Router struct {
 
 // NotFoundDefault는 기본 404 에러 핸들러입니다.
 // 요청된 리소스를 찾을 수 없을 때 표준 HTTP 404 응답을 반환합니다.
-func NotFoundDefault(Writer http.ResponseWriter, Request *http.Request) {
-	http.Error(Writer, "404 Not Found", http.StatusNotFound)
+func NotFoundDefault(writer http.ResponseWriter, request *http.Request) {
+	http.Error(writer, "404 Not Found", http.StatusNotFound)
 }
 
 // NotAllowedDefault는 기본 405 에러 핸들러입니다.
 // 지원되지 않는 HTTP 메서드로 요청이 들어왔을 때 표준 HTTP 405 응답을 반환합니다.
-func NotAllowedDefault(Writer http.ResponseWriter, Request *http.Request) {
-	http.Error(Writer, "Method Not Allowed", http.StatusMethodNotAllowed)
+func NotAllowedDefault(writer http.ResponseWriter, request *http.Request) {
+	http.Error(writer, "Method Not Allowed", http.StatusMethodNotAllowed)
 }
 
 // NewRouter는 새로운 Router 인스턴스를 생성합니다.

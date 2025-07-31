@@ -1,29 +1,28 @@
-// Package Tree는 HTTP 라우팅을 위한 Radix Tree 구현을 제공합니다.
-// 효율적인 URL 패턴 매칭과 핸들러 관리를 위한 트리 구조를 구현합니다.
+// Package Tree provides Radix Tree implementation for HTTP routing.
+// Implements tree structure for efficient URL pattern matching and handler management.
 package Tree
 
 import (
 	"LiteFrame/Router/Error"
 	"LiteFrame/Router/Middleware"
 	"LiteFrame/Router/Param"
-	"fmt"
 	"net/http"
 	"sort"
 )
 
-// Tree는 HTTP 라우팅을 위한 Radix Tree 구조체입니다.
-// 루트 노드, 매개변수 풀, 핸들러 및 미들웨어를 관리합니다.
+// Tree is a Radix Tree structure for HTTP routing.
+// Manages root node, parameter pool, handlers, and middleware.
 type Tree struct {
-	RootNode          *Node                   // 트리의 루트 노드
-	Pool              *Param.ParamsPool       // 매개변수 재사용을 위한 풀
-	NotFoundHandler   HandlerFunc             // 404 핸들러
-	NotAllowedHandler HandlerFunc             // 405 핸들러
-	Middlewares       []Middleware.Middleware // 미들웨어 목록
+	RootNode           *Node                   // Root node of the tree
+	Pool               *Param.ParamsPool       // Pool for parameter reuse
+	NotFoundHandler    HandlerFunc             // 404 handler
+	NotAllowedHandler  HandlerFunc             // 405 handler
+	Middlewares        []Middleware.Middleware // Middleware list
 	CompiledMiddleware func(HandlerFunc) HandlerFunc
 }
 
-// NewTree는 새로운 Tree 인스턴스를 생성합니다.
-// 루트 노드와 매개변수 풀을 초기화합니다.
+// NewTree creates a new Tree instance.
+// Initializes root node and parameter pool.
 func NewTree() Tree {
 	return Tree{
 		RootNode: NewNode(RootType, "/"),
@@ -31,23 +30,26 @@ func NewTree() Tree {
 	}
 }
 
-// IsWildCard는 입력 문자열이 와일드카드 패턴(:param)인지 확인합니다.
+// IsWildCard checks if input string is a wildcard pattern (:param).
+//
 //go:inline
-func (Instance *Tree) IsWildCard(Input string) bool {
-	return len(Input) > 0 && Input[0] == WildCardPrefix
+func (instance *Tree) IsWildCard(input string) bool {
+	return len(input) > 0 && input[0] == WildCardPrefix
 }
 
-// IsCatchAll는 입력 문자열이 캐치올 패턴(*path)인지 확인합니다.
+// IsCatchAll checks if input string is a catch-all pattern (*path).
+//
 //go:inline
-func (Instance *Tree) IsCatchAll(Input string) bool {
-	return len(Input) > 0 && Input[0] == CatchAllPrefix
+func (instance *Tree) IsCatchAll(input string) bool {
+	return len(input) > 0 && input[0] == CatchAllPrefix
 }
 
-// StringToMethodType는 HTTP 메서드 문자열을 MethodType으로 변환합니다.
-// 지원되지 않는 메서드의 경우 NotAllowed를 반환합니다.
+// StringToMethodType converts HTTP method string to MethodType.
+// Returns NotAllowed for unsupported methods.
+//
 //go:inline
-func (Instance *Tree) StringToMethodType(Method string) MethodType {
-	switch Method {
+func (instance *Tree) StringToMethodType(method string) MethodType {
+	switch method {
 	case "GET":
 		return GET
 	case "HEAD":
@@ -71,306 +73,307 @@ func (Instance *Tree) StringToMethodType(Method string) MethodType {
 	}
 }
 
-// Match는 PathWithSegment와 문자열의 공통 접두사를 찾아 매칭 결과를 반환합니다.
-// 반환값: (완전매칭여부, 매칭된인덱스, 남은PathWithSegment)
-// PathWithSegment 기반으로 최적화된 매칭 알고리즘입니다.
+// Match finds common prefix between PathWithSegment and string, returning match results.
+// Returns: (complete match, matched index, remaining PathWithSegment)
+// Optimized matching algorithm based on PathWithSegment.
+//
 //go:inline
-func (Instance *Tree) Match(SourcePath PathWithSegment, TargetPath string) (bool, int, PathWithSegment) {
-	// PathWithSegment와 문자열 중 짧은 길이를 기준으로 비교 범위 설정
+func (instance *Tree) Match(sourcePath PathWithSegment, targetPath string) (bool, int, PathWithSegment) {
+	// Set comparison range based on shorter length between PathWithSegment and string
 
-	SourceLength := SourcePath.GetLength()
-	Length := min(SourceLength, len(TargetPath))
-	// 바이트 단위로 순차 비교하여 공통 접두사 길이 계산
-	var Index int
-	for Index = 0; Index < Length; Index++ {
-		if SourcePath.Body[SourcePath.Start+Index] != TargetPath[Index] {
+	sourceLength := sourcePath.GetLength()
+	length := min(sourceLength, len(targetPath))
+	// Calculate common prefix length by sequential byte comparison
+	var index int
+	for index = 0; index < length; index++ {
+		if sourcePath.Body[sourcePath.Start+index] != targetPath[index] {
 			break
 		}
 	}
-	// PathWithSegment가 Two의 완전한 접두사인지 확인
-	Matched := Index == SourcePath.GetLength()
-	if Matched {
-		SourcePath.Start = SourcePath.End
+	// Check if PathWithSegment is a complete prefix of target
+	matched := index == sourcePath.GetLength()
+	if matched {
+		sourcePath.Start = sourcePath.End
 	}
-	// PathWithSegment에서 매칭되지 않은 나머지 부분으로 업데이트
-	if Index < SourcePath.GetLength() {
-		SourcePath.Start = SourcePath.Start + Index
+	// Update PathWithSegment to remaining unmatched portion
+	if index < sourcePath.GetLength() {
+		sourcePath.Start = sourcePath.Start + index
 	}
-	return Matched, Index, SourcePath
+	return matched, index, sourcePath
 }
 
-// SelectHandler는 노드에서 메서드에 맞는 핸들러를 선택하고 매개변수를 컨텍스트에 주입합니다.
-// 핸들러가 없으면 NotAllowedHandler를 반환합니다.
-// 중요: 메모리 풀 관리와 컨텍스트 주입을 동시에 처리하는 핵심 함수입니다.
-func (Instance *Tree) SelectHandler(Node *Node, Method MethodType) HandlerFunc {
-	if Handler := Node.Handlers[Method]; Handler != nil {
-		// 클로저를 통해 매개변수를 컨텍스트에 주입하고 메모리 풀 반환 보장
-		return Handler
+// SelectHandler selects method-appropriate handler from node and injects parameters into context.
+// Returns NotAllowedHandler if handler not found.
+// Important: Core function handling both memory pool management and context injection.
+func (instance *Tree) SelectHandler(node *Node, method MethodType) HandlerFunc {
+	if handler := node.Handlers[method]; handler != nil {
+		// Inject parameters into context through closure and ensure memory pool return
+		return handler
 	}
-	return Instance.NotAllowedHandler
+	return instance.NotAllowedHandler
 }
 
-// InsertUniqueTypeChild는 고유한 타입의 자식 노드(WildCard/CatchAll)를 삽입합니다.
-// 중복된 매개변수명이 있으면 에러를 반환합니다.
-// 함수형 프로그래밍 패턴: 고차 함수를 활용한 중복 코드 제거
+// InsertUniqueTypeChild inserts unique type child nodes (WildCard/CatchAll).
+// Returns error if duplicate parameter names exist.
+// Functional programming pattern: Eliminates duplicate code using higher-order functions
 
-func (Instance *Tree) InsertUniqueTypeChild(Parent *Node, Path string, Target *Node, Type NodeType, ErrorFn func(string) error, SetFn func(*Node, *Node)) (*Node, error) {
+func (instance *Tree) InsertUniqueTypeChild(parent *Node, path string, target *Node, nodeType NodeType, errorFn func(string) error, setFn func(*Node, *Node)) (*Node, error) {
 	switch {
-	// 빈 매개변수명 검증 (":" 또는 "*" 만 있는 경우)
-	case Path[1:] == "":
-		return nil, Error.NewErrorWithCode(Error.NilParameter, Path)
-	// 같은 타입이지만 다른 매개변수명인 경우 충돌 오류
-	case Target != nil && Target.Param != Path[1:]:
-		return nil, ErrorFn(Path)
-	// 동일한 매개변수명의 노드가 이미 존재하는 경우 재사용
-	case Target != nil && Target.Param == Path[1:]:
-		return Target, nil
-	// 새로운 매개변수 노드 생성
+	// Validate empty parameter name (cases with only ":" or "*")
+	case path[1:] == "":
+		return nil, Error.NewErrorWithCode(Error.NilParameter, path)
+	// Conflict error for same type but different parameter name
+	case target != nil && target.Param != path[1:]:
+		return nil, errorFn(path)
+	// Reuse if node with same parameter name already exists
+	case target != nil && target.Param == path[1:]:
+		return target, nil
+	// Create new parameter node
 	default:
-		Child := NewNode(Type, Path)
-		Child.Param = Path[1:] // 접두사(: 또는 *) 제거하여 매개변수명만 저장
-		SetFn(Parent, Child)   // 함수 포인터를 통한 타입별 노드 설정
-		return Child, nil
+		child := NewNode(nodeType, path)
+		child.Param = path[1:] // Store only parameter name by removing prefix (: or *)
+		setFn(parent, child)   // Type-specific node setting through function pointer
+		return child, nil
 	}
 }
 
-// InsertChild는 부모 노드에 자식 노드를 삽입합니다.
-// 경로 타입에 따라 Static, WildCard, CatchAll 노드를 생성합니다.
-func (Instance *Tree) InsertChild(Parent *Node, Path string) (*Node, error) {
+// InsertChild inserts child node into parent node.
+// Creates Static, WildCard, or CatchAll nodes based on path type.
+func (instance *Tree) InsertChild(parent *Node, path string) (*Node, error) {
 	switch {
-	case Instance.IsWildCard(Path):
-		return Instance.InsertUniqueTypeChild(Parent, Path, Parent.WildCard, WildCardType,
-			func(Path string) error { return Error.NewErrorWithCode(Error.DuplicateWildCard, Path) },
-			func(Parent, Child *Node) { Parent.WildCard = Child })
-	case Instance.IsCatchAll(Path):
-		return Instance.InsertUniqueTypeChild(Parent, Path, Parent.CatchAll, CatchAllType,
-			func(Path string) error { return Error.NewErrorWithCode(Error.DuplicateCatchAll, Path) },
-			func(Parent, Child *Node) { Parent.CatchAll = Child })
+	case instance.IsWildCard(path):
+		return instance.InsertUniqueTypeChild(parent, path, parent.WildCard, WildCardType,
+			func(path string) error { return Error.NewErrorWithCode(Error.DuplicateWildCard, path) },
+			func(parent, child *Node) { parent.WildCard = child })
+	case instance.IsCatchAll(path):
+		return instance.InsertUniqueTypeChild(parent, path, parent.CatchAll, CatchAllType,
+			func(path string) error { return Error.NewErrorWithCode(Error.DuplicateCatchAll, path) },
+			func(parent, child *Node) { parent.CatchAll = child })
 	default:
-		Child := NewNode(StaticType, Path)
-		InsertLocation := sort.Search(len(Parent.Indices), func(Index int) bool { return Parent.Indices[Index] >= Path[0] })
-		
-		Parent.Indices = append(Parent.Indices, 0)
-      	copy(Parent.Indices[InsertLocation+1:], Parent.Indices[InsertLocation:])
-      	Parent.Indices[InsertLocation] = Path[0]
+		child := NewNode(StaticType, path)
+		insertLocation := sort.Search(len(parent.Indices), func(index int) bool { return parent.Indices[index] >= path[0] })
 
-      	Parent.Children = append(Parent.Children, nil)
-      	copy(Parent.Children[InsertLocation+1:], Parent.Children[InsertLocation:])
-      	Parent.Children[InsertLocation] = Child
-		return Child, nil
+		parent.Indices = append(parent.Indices, 0)
+		copy(parent.Indices[insertLocation+1:], parent.Indices[insertLocation:])
+		parent.Indices[insertLocation] = path[0]
+
+		parent.Children = append(parent.Children, nil)
+		copy(parent.Children[insertLocation+1:], parent.Children[insertLocation:])
+		parent.Children[insertLocation] = child
+		return child, nil
 	}
 }
 
-// SplitNode는 기존 노드를 분할점에서 두 개의 노드로 분리합니다.
-// 공통 접두사를 가진 새로운 부모 노드를 생성하고 기존 노드를 자식으로 만듭니다.
+// SplitNode splits existing node into two nodes at split point.
+// Creates new parent node with common prefix and makes existing node a child.
+//
 //go:inline
-func (Instance *Tree) SplitNode(Parent *Node, Child *Node, SplitPoint int) (*Node, error) {
-	if SplitPoint < 0 || SplitPoint > len(Child.Path) {
-		return nil, fmt.Errorf("split point %d is out of range for path %q (length %d)", SplitPoint, Child.Path, len(Child.Path))
+func (instance *Tree) SplitNode(parent *Node, child *Node, splitPoint int) (*Node, error) {
+	if splitPoint < 0 || splitPoint > len(child.Path) {
+		return  nil , Error.NewErrorWithCode(Error.InvalidSplitPoint,child.Path) 
 	}
-	Left := Child.Path[:SplitPoint]
-	Right := Child.Path[SplitPoint:]
-	if len(Left) == 0 {
-		return nil, Error.NewErrorWithCode(Error.SplitFailed, Child.Path)
+	left := child.Path[:splitPoint]
+	right := child.Path[splitPoint:]
+	if len(left) == 0 {
+		return nil, Error.NewErrorWithCode(Error.SplitFailed, child.Path)
 	}
-	NewParent := NewNode(StaticType, Left)
-	for Index, Target := range Parent.Children {
-		if Target == Child {
-			Parent.Children[Index] = NewParent
-			if len(Right) > 0 {
-				NewParent.Indices = []byte{Right[0]}
-				Child.Path = Right
-				NewParent.Children = []*Node{Child}
+	newParent := NewNode(StaticType, left)
+	for index, target := range parent.Children {
+		if target == child {
+			parent.Children[index] = newParent
+			if len(right) > 0 {
+				newParent.Indices = []byte{right[0]}
+				child.Path = right
+				newParent.Children = []*Node{child}
 			} else {
-				Child.Path = Right
-				NewParent.Indices = []byte{}
-				NewParent.Children = []*Node{}
+				child.Path = right
+				newParent.Indices = []byte{}
+				newParent.Children = []*Node{}
 			}
 		}
 	}
-	return NewParent, nil
+	return newParent, nil
 }
 
-// SetHandler는 지정된 경로와 메서드에 대한 핸들러를 트리에 등록합니다.
-// PathWithSegment를 사용하여 경로를 효율적으로 처리하고 필요한 노드들을 생성하거나 기존 노드를 분할합니다.
+// SetHandler registers handler for specified path and method in the tree.
+// Uses PathWithSegment for efficient path processing and creates nodes or splits existing nodes as needed.
 //
-// 동작 방식:
-// 1. PathWithSegment로 경로를 세그먼트 단위로 분석
-// 2. 트리를 순회하며 매칭되는 노드 탐색
-// 3. 완전 매칭: 다음 세그먼트로 이동
-// 4. 부분 매칭: 노드 분할 후 계속 진행
-// 5. 매칭 실패: 새로운 자식 노드 생성
-func (Instance *Tree) SetHandler(Method MethodType, RawPath string, Handler HandlerFunc) error {
-	if RawPath == "" {
-		return Error.NewErrorWithCode(Error.InvalidParameter, RawPath)
+// Operation:
+// 1. Analyze path segment by segment using PathWithSegment
+// 2. Traverse tree searching for matching nodes
+// 3. Complete match: Move to next segment
+// 4. Partial match: Split node then continue
+// 5. Match failure: Create new child node
+func (instance *Tree) SetHandler(method MethodType, rawPath string, handler HandlerFunc) error {
+	if rawPath == "" {
+		return Error.NewErrorWithCode(Error.InvalidParameter, rawPath)
 	}
-	if Method == NotAllowed {
-		return Error.NewErrorWithCode(Error.MethodNotAllowed, RawPath)
+	if method == NotAllowed {
+		return Error.NewErrorWithCode(Error.MethodNotAllowed, rawPath)
 	}
-	if Method != CONNECT && Handler == nil {
-		return Error.NewErrorWithCode(Error.InvalidParameter, RawPath)
+	if method != CONNECT && handler == nil {
+		return Error.NewErrorWithCode(Error.InvalidParameter, rawPath)
 	}
-	// PathWithSegment 구조체를 사용한 효율적인 경로 처리
-	Path := NewPathWithSegment(RawPath)
-	Path.Next()
-	if Path.IsSame() {
-		Instance.RootNode.Handlers[Method] = Handler
+	// Efficient path processing using PathWithSegment structure
+	path := NewPathWithSegment(rawPath)
+	path.Next()
+	if path.IsSame() {
+		instance.RootNode.Handlers[method] = handler
 		return nil
 	}
-	Parent := Instance.RootNode
-	SetHelper:
+	parent := instance.RootNode
+setHelper:
 	for {
-		if Path.IsSame() {
-			Parent.Handlers[Method] = Handler
+		if path.IsSame() {
+			parent.Handlers[method] = handler
 			break
 		}
-		Index := sort.Search(len(Parent.Indices), func (Index int) bool {
-			return Parent.Indices[Index] >= Path.Body[Path.Start] 
+		index := sort.Search(len(parent.Indices), func(index int) bool {
+			return parent.Indices[index] >= path.Body[path.Start]
 		})
-		if Index < len(Parent.Indices) && Parent.Indices[Index] == Path.Body[Path.Start] {
-			Matched , MatchingPoint , Left := Instance.Match(*Path,Parent.Children[Index].Path)
-			if Matched {
-				Path.Next()
-				Parent = Parent.Children[Index]
-				continue SetHelper
+		if index < len(parent.Indices) && parent.Indices[index] == path.Body[path.Start] {
+			matched, matchingPoint, left := instance.Match(*path, parent.Children[index].Path)
+			if matched {
+				path.Next()
+				parent = parent.Children[index]
+				continue setHelper
 			}
-			if MatchingPoint < len(Parent.Children[Index].Path) {
-				NewParent, Err := Instance.SplitNode(Parent, Parent.Children[Index], MatchingPoint)
-				if Err != nil {
-					return Err
+			if matchingPoint < len(parent.Children[index].Path) {
+				newParent, err := instance.SplitNode(parent, parent.Children[index], matchingPoint)
+				if err != nil {
+					return err
 				}
-				Parent = NewParent
-				if Left.GetLength() > 0 {
-					Path = &Left
-					continue SetHelper
+				parent = newParent
+				if left.GetLength() > 0 {
+					path = &left
+					continue setHelper
 				}
-				Path.Next()
-				continue SetHelper
+				path.Next()
+				continue setHelper
 			}
-			Parent = Parent.Children[Index]
-			Path = &Left
-			continue SetHelper
+			parent = parent.Children[index]
+			path = &left
+			continue setHelper
 		}
-		Child, Err := Instance.InsertChild(Parent, Path.Get())
-		if Err != nil {
-			return Err
+		child, err := instance.InsertChild(parent, path.Get())
+		if err != nil {
+			return err
 		}
-		Parent = Child
-		Path.Next()
-		continue SetHelper
+		parent = child
+		path.Next()
+		continue setHelper
 	}
 	return nil
 }
 
-// GetHandler는 HTTP 요청에 대응하는 핸들러를 트리에서 찾아 반환합니다.
-// PathWithSegment를 사용하여 경로를 효율적으로 처리하고 매개변수를 추출하여 핸들러를 선택합니다.
+// GetHandler finds and returns handler corresponding to HTTP request from tree.
+// Uses PathWithSegment for efficient path processing and extracts parameters to select handler.
 //
-// 매칭 우선순위:
-// 1. Static 노드: 정확한 문자열 매칭 (가장 높은 우선순위)
-// 2. WildCard 노드: 단일 세그먼트 매개변수 (:param)
-// 3. CatchAll 노드: 나머지 모든 경로 (*path, 가장 낮은 우선순위)
+// Matching priority:
+// 1. Static nodes: Exact string matching (highest priority)
+// 2. WildCard nodes: Single segment parameters (:param)
+// 3. CatchAll nodes: All remaining paths (*path, lowest priority)
 //
-// 반환값: (핸들러함수, 매개변수객체) - 매개변수가 없으면 nil 반환
-func (Instance *Tree) GetHandler(Request *http.Request, GetParams func() *Param.Params) (HandlerFunc, *Param.Params) {
-	RawPath := Request.URL.Path
-	Method := Instance.StringToMethodType(Request.Method)
-	var Params *Param.Params
-	// PathWithSegment를 사용한 메모리 효율적인 경로 처리
-	Path := NewPathWithSegment(RawPath)
-	if Method == NotAllowed {
-		return Instance.NotAllowedHandler, nil
+// Returns: (handler function, parameter object) - returns nil if no parameters
+func (instance *Tree) GetHandler(request *http.Request, getParams func() *Param.Params) (HandlerFunc, *Param.Params) {
+	rawPath := request.URL.Path
+	method := instance.StringToMethodType(request.Method)
+	var params *Param.Params
+	// Memory-efficient path processing using PathWithSegment
+	path := NewPathWithSegment(rawPath)
+	if method == NotAllowed {
+		return instance.NotAllowedHandler, nil
 	}
-	Path.Next()
-	Node := Instance.RootNode
-GetHelper:
+	path.Next()
+	node := instance.RootNode
+getHelper:
 	for {
-		if Path.GetLength() == 0 {
-			return Instance.SelectHandler(Node, Method), Params
+		if path.GetLength() == 0 {
+			return instance.SelectHandler(node, method), params
 		}
 
-		for Index := 0; Index < len(Node.Indices); Index++ {
-			if Path.Body[Path.Start] == Node.Indices[Index] {
-				Matched, MatchingPoint, Left := Instance.Match(*Path, Node.Children[Index].Path)
+		for index := 0; index < len(node.Indices); index++ {
+			if path.Body[path.Start] == node.Indices[index] {
+				matched, matchingPoint, left := instance.Match(*path, node.Children[index].Path)
 				switch {
-				case Matched:
-					Path.Next()
-					Node = Node.Children[Index]
-					continue GetHelper
-				case MatchingPoint > 0 && MatchingPoint == len(Node.Children[Index].Path) && Path.GetLength() > 0:
-					Node = Node.Children[Index]
-					Path = &Left
-					continue GetHelper
+				case matched:
+					path.Next()
+					node = node.Children[index]
+					continue getHelper
+				case matchingPoint > 0 && matchingPoint == len(node.Children[index].Path) && path.GetLength() > 0:
+					node = node.Children[index]
+					path = &left
+					continue getHelper
 				}
 			}
 		}
-		// 2순위: WildCard 노드 매칭 (단일 세그먼트 캡처)
-		if Node.WildCard != nil {
-			if Params == nil {
-				Params = GetParams()
+		// 2nd priority: WildCard node matching (single segment capture)
+		if node.WildCard != nil {
+			if params == nil {
+				params = getParams()
 			}
-			// 현재 세그먼트를 매개변수로 저장하고 다음 세그먼트로 진행
-			Params.Add(Node.WildCard.Param, Path.Get())
-			Path.Next()
-			Node = Node.WildCard
-			continue GetHelper
+			// Store current segment as parameter and proceed to next segment
+			params.Add(node.WildCard.Param, path.Get())
+			path.Next()
+			node = node.WildCard
+			continue getHelper
 		}
-		// 3순위: CatchAll 노드 매칭 (나머지 모든 경로 캡처)
-		if Node.CatchAll != nil {
-			if Params == nil {
-				Params = GetParams()
+		// 3rd priority: CatchAll node matching (capture all remaining paths)
+		if node.CatchAll != nil {
+			if params == nil {
+				params = getParams()
 			}
-			// PathWithSegment의 나머지 경로를 하나의 매개변수로 저장
-			Params.Add(Node.CatchAll.Param, Path.GetToEnd())
-			Path.Start = Path.End
-			// 빈 경로로 CatchAll 노드에서 핸들러 검색 (경로 소비 완료)
-			Node = Node.CatchAll
-			continue GetHelper
+			// Store remaining path of PathWithSegment as single parameter
+			params.Add(node.CatchAll.Param, path.GetToEnd())
+			path.Start = path.End
+			// Search handler in CatchAll node with empty path (path consumption complete)
+			node = node.CatchAll
+			continue getHelper
 		}
-		// 매칭되는 라우트가 없는 경우 매개변수 객체 반환 후 404 핸들러 반환
-		return Instance.NotFoundHandler, Params
+		// Return parameter object and 404 handler when no matching route found
+		return instance.NotFoundHandler, params
 	}
 }
 
-// SetMiddleware는 트리에 미들웨어를 추가합니다.
-// 추가된 미들웨어는 모든 핸들러에 적용됩니다.
-func (Instance *Tree) SetMiddleware(Middleware Middleware.Middleware) {
-	Instance.Middlewares = append(Instance.Middlewares, Middleware)
+// SetMiddleware adds middleware to the tree.
+// Added middleware applies to all handlers.
+func (instance *Tree) SetMiddleware(middleware Middleware.Middleware) {
+	instance.Middlewares = append(instance.Middlewares, middleware)
 }
 
-func (Instance *Tree) CompileMiddlewares() {
-	if len(Instance.Middlewares) == 0 {
-		Instance.CompiledMiddleware = nil
+func (instance *Tree) CompileMiddlewares() {
+	if len(instance.Middlewares) == 0 {
+		instance.CompiledMiddleware = nil
 		return
 	}
 
-	Instance.CompiledMiddleware = func(BaseHandler HandlerFunc) HandlerFunc {
-		Temp := BaseHandler
-		for Index := len(Instance.Middlewares) -1; Index> -1 ; Index-- {
-			Temp = Instance.Middlewares[Index].GetHandler()(Temp)
+	instance.CompiledMiddleware = func(baseHandler HandlerFunc) HandlerFunc {
+		temp := baseHandler
+		for index := len(instance.Middlewares) - 1; index > -1; index-- {
+			temp = instance.Middlewares[index].GetHandler()(temp)
 		}
-		return Temp
+		return temp
 	}
 }
 
-
-// ApplyMiddleware는 핸들러에 등록된 미들웨어들을 역순으로 적용합니다.
-// 마지막에 등록된 미들웨어가 가장 바깥쪽에 위치하게 됩니다.
-func (Instance *Tree) ApplyMiddleware(Handler HandlerFunc) HandlerFunc {
-	if Instance.CompiledMiddleware == nil {
-		return  Handler
+// ApplyMiddleware applies registered middleware to handlers in reverse order.
+// Last registered middleware becomes outermost layer.
+func (instance *Tree) ApplyMiddleware(handler HandlerFunc) HandlerFunc {
+	if instance.CompiledMiddleware == nil {
+		return handler
 	}
-	return Instance.CompiledMiddleware(Handler)
+	return instance.CompiledMiddleware(handler)
 }
 
-// ServeHTTP는 http.Handler 인터페이스를 구현합니다.
-// 요청에 대한 핸들러를 찾아 미들웨어를 적용한 후 실행합니다.
-func (Instance *Tree) ServeHTTP(Writer http.ResponseWriter, Request *http.Request) {
-	Handler, Params := Instance.GetHandler(Request, Instance.Pool.Get)
-	Handler = Instance.ApplyMiddleware(Handler)
-	Handler(Writer, Request, Params)
+// ServeHTTP implements http.Handler interface.
+// Finds handler for request, applies middleware, then executes.
+func (instance *Tree) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	handler, params := instance.GetHandler(request, instance.Pool.Get)
+	handler = instance.ApplyMiddleware(handler)
+	handler(writer, request, params)
 
-	// 매개변수 객체를 풀에 반환
-	if Params != nil {
-		Instance.Pool.Put(Params)
+	// Return parameter object to pool
+	if params != nil {
+		instance.Pool.Put(params)
 	}
 }

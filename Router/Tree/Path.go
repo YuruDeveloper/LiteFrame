@@ -1,101 +1,101 @@
-// Package Tree는 효율적인 경로 처리를 위한 PathWithSegment 구조체를 제공합니다.
-// 메모리 할당 없이 경로를 세그먼트 단위로 순회할 수 있는 구조체입니다.
+// Package Tree provides PathWithSegment structure for efficient path processing.
+// A zero-allocation structure for iterating through URL paths segment by segment.
 package Tree
 
-// NewPathWithSegment는 새로운 PathWithSegment 인스턴스를 생성합니다.
-// Path: 분석할 URL 경로 문자열
-// 초기 상태에서는 Start와 End가 모두 0으로 설정됩니다.
-func NewPathWithSegment(Path string) *PathWithSegment {
+// NewPathWithSegment creates a new PathWithSegment instance.
+// Path: URL path string to analyze
+// Initial state has both Start and End set to 0.
+func NewPathWithSegment(path string) *PathWithSegment {
 	return &PathWithSegment{
-		Body:    Path,
-		BodyLen: len(Path),
+		Body:    path,
+		BodyLen: len(path),
 		Start:   0,
 		End:     0,
 	}
 }
 
-// PathWithSegment는 URL 경로를 메모리 할당 없이 세그먼트 단위로 처리하는 구조체입니다.
-// 문자열을 복사하지 않고 인덱스를 이용하여 경로 세그먼트를 순회합니다.
+// PathWithSegment is a structure for processing URL paths segment by segment without memory allocation.
+// It traverses path segments using indices without copying strings.
 //
-// 성능 최적화:
-// - 제로 할당: 새로운 문자열을 생성하지 않고 기존 문자열의 부분을 참조
-// - 반복자 패턴: Next()를 통해 순차적으로 세그먼트 이동
-// - 경계 검사: 안전한 인덱스 접근을 위한 검증 함수들 제공
+// Performance optimizations:
+// - Zero allocation: References parts of existing string without creating new strings
+// - Iterator pattern: Sequential segment movement through Next()
+// - Boundary checking: Provides validation functions for safe index access
 type PathWithSegment struct {
-	Body    string // 원본 경로 문자열 (불변)
+	Body    string // Original path string (immutable)
 	BodyLen int
-	Start   int // 현재 세그먼트의 시작 인덱스
-	End     int // 현재 세그먼트의 끝 인덱스 (exclusive)
+	Start   int // Start index of current segment
+	End     int // End index of current segment (exclusive)
 }
 
-// Next는 다음 경로 세그먼트로 이동합니다.
-// 경로 구분자('/')를 건너뛰고 다음 세그먼트의 시작과 끝 인덱스를 설정합니다.
+// Next moves to the next path segment.
+// Skips path separators ('/') and sets start and end indices for the next segment.
 //
-// 동작 방식:
-// 1. 현재 End 위치를 새로운 Start로 설정
-// 2. 연속된 '/' 문자들을 건너뛰기
-// 3. 다음 '/' 또는 문자열 끝까지를 새로운 세그먼트로 설정
-func (Instance *PathWithSegment) Next() {
-	Instance.Start = Instance.End
-	if Instance.IsEnd() {
+// Operation:
+// 1. Set current End position as new Start
+// 2. Skip consecutive '/' characters
+// 3. Set next segment until next '/' or end of string
+func (instance *PathWithSegment) Next() {
+	instance.Start = instance.End
+	if instance.IsEnd() {
 		return
 	}
 
-	// 연속된 경로 구분자('/')들을 건너뛰기
-	for Instance.BodyLen > Instance.Start && Instance.Body[Instance.Start] == '/' {
-		Instance.Start++
+	// Skip consecutive path separators ('/')
+	for instance.BodyLen > instance.Start && instance.Body[instance.Start] == '/' {
+		instance.Start++
 	}
-	if Instance.IsEnd() {
-		Instance.End = Instance.Start
+	if instance.IsEnd() {
+		instance.End = instance.Start
 		return
 	}
-	// 다음 경로 구분자까지 또는 문자열 끝까지 세그먼트 설정
-	Instance.End = Instance.Start
-	for Instance.End < Instance.BodyLen && Instance.Body[Instance.End] != PathSeparator {
-		Instance.End++
+	// Set segment until next path separator or end of string
+	instance.End = instance.Start
+	for instance.End < instance.BodyLen && instance.Body[instance.End] != PathSeparator {
+		instance.End++
 	}
 }
 
-// IsEnd는 경로의 끝에 도달했는지 확인합니다.
-// Start 인덱스가 문자열 길이와 같거나 클 때 true를 반환합니다.
+// IsEnd checks if the end of path has been reached.
+// Returns true when Start index equals or exceeds string length.
 //
 //go:inline
-func (Instance *PathWithSegment) IsEnd() bool {
-	return Instance.Start >= Instance.BodyLen
+func (instance *PathWithSegment) IsEnd() bool {
+	return instance.Start >= instance.BodyLen
 }
 
-// IsSame은 현재 세그먼트가 빈 세그먼트인지 확인합니다.
-// Start와 End가 같을 때 true를 반환합니다. (길이가 0인 세그먼트)
+// IsSame checks if the current segment is empty.
+// Returns true when Start equals End (zero-length segment).
 //
 //go:inline
-func (Instance *PathWithSegment) IsSame() bool {
-	return Instance.Start == Instance.End
+func (instance *PathWithSegment) IsSame() bool {
+	return instance.Start == instance.End
 }
 
-// IsNotValid는 현재 인덱스 상태가 유효하지 않은지 확인합니다.
-// 경로 끝 도달, 인덱스 범위 초과, 논리적 오류를 검사합니다.
-func (Instance *PathWithSegment) IsNotValid() bool {
-	return Instance.IsEnd() || Instance.End > len(Instance.Body) || Instance.Start > Instance.End
+// IsNotValid checks if the current index state is invalid.
+// Checks for end of path, index out of bounds, and logical errors.
+func (instance *PathWithSegment) IsNotValid() bool {
+	return instance.IsEnd() || instance.End > len(instance.Body) || instance.Start > instance.End
 }
 
-// Get은 현재 세그먼트의 문자열을 반환합니다.
-// 유효하지 않은 상태일 경우 빈 문자열을 반환합니다.
-// 메모리 할당: 새로운 문자열 생성 (필요한 경우에만 호출)
-func (Instance *PathWithSegment) Get() string {
-	if Instance.IsNotValid() {
+// Get returns the string of the current segment.
+// Returns empty string if in invalid state.
+// Memory allocation: Creates new string (call only when necessary)
+func (instance *PathWithSegment) Get() string {
+	if instance.IsNotValid() {
 		return ""
 	}
-	return string(Instance.Body[Instance.Start:Instance.End])
+	return string(instance.Body[instance.Start:instance.End])
 }
 
-// GetToEnd는 현재 위치부터 경로 끝까지의 문자열을 반환합니다.
-// CatchAll 라우트에서 나머지 경로를 모두 캡처할 때 사용됩니다.
-func (Instance *PathWithSegment) GetToEnd() string {
-	return string(Instance.Body[Instance.Start:])
+// GetToEnd returns the string from current position to end of path.
+// Used by CatchAll routes to capture all remaining path.
+func (instance *PathWithSegment) GetToEnd() string {
+	return string(instance.Body[instance.Start:])
 }
 
-// GetLength는 현재 세그먼트의 길이를 반환합니다.
-// 문자열 생성 없이 길이만 계산하므로 메모리 효율적입니다.
-func (Instance *PathWithSegment) GetLength() int {
-	return Instance.End - Instance.Start
+// GetLength returns the length of the current segment.
+// Memory efficient as it calculates length without creating strings.
+func (instance *PathWithSegment) GetLength() int {
+	return instance.End - instance.Start
 }

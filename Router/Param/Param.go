@@ -1,5 +1,5 @@
-// Package Param은 HTTP 라우팅에서 사용되는 매개변수 관리 기능을 제공합니다.
-// 성능 최적화를 위한 매개변수 풀링과 컨텍스트 기반 매개변수 전달을 지원합니다.
+// Package Param provides parameter management functionality used in HTTP routing.
+// Supports parameter pooling and context-based parameter passing for performance optimization.
 package Param
 
 import (
@@ -13,102 +13,102 @@ const (
 	DefaultBufferSize = 10
 )
 
-// NewParams는 새로운 Params 인스턴스를 생성합니다.
-// 기본 용량 2로 매개변수 리스트를 초기화합니다.
-// 성능 최적화: 대부분의 라우트는 2개 이하의 매개변수를 가지므로 메모리 재할당을 최소화합니다.
+// NewParams creates a new Params instance.
+// Initializes parameter list with default capacity of 2.
+// Performance optimization: Most routes have 2 or fewer parameters, minimizing memory reallocation.
 func NewParams() *Params {
 	return &Params{
-		List: make([]Param, 0, DefaultSize), // 기본 용량 2: 일반적인 API 패턴에 최적화된 값
+		List: make([]Param, 0, DefaultSize), // Default capacity 2: Value optimized for common API patterns
 	}
 }
 
-// Param은 단일 매개변수의 키-값 쌍을 나타내는 구조체입니다.
-// URL 경로에서 추출된 매개변수 이름과 값을 저장합니다.
+// Param is a structure representing a key-value pair of a single parameter.
+// Stores parameter name and value extracted from URL path.
 type Param struct {
-	Key   string // 매개변수 이름 (:에서 추출된 이름)
-	Value string // 매개변수 값 (URL에서 추출된 실제 값)
+	Key   string // Parameter name (name extracted from :)
+	Value string // Parameter value (actual value extracted from URL)
 }
 
-// Params는 여러 매개변수를 저장하는 구조체입니다.
-// 한 번의 HTTP 요청에서 추출된 모든 매개변수들을 관리합니다.
+// Params is a structure that stores multiple parameters.
+// Manages all parameters extracted from a single HTTP request.
 type Params struct {
-	List []Param // 매개변수 리스트
+	List []Param // Parameter list
 }
 
-// Key는 컨텍스트에서 매개변수를 식별하기 위한 빈 구조체입니다.
-// context.WithValue에서 매개변수 저장을 위한 키로 사용됩니다.
+// Key is an empty structure for identifying parameters in context.
+// Used as a key for parameter storage in context.WithValue.
 type Key struct{}
 
-// Add는 매개변수 리스트에 새로운 매개변수를 추가합니다.
-// URL 경로에서 추출된 매개변수 이름과 값을 저장합니다.
-func (Instance *Params) Add(Key string, Value string) {
-	Instance.List = append(Instance.List, Param{Key: Key, Value: Value})
+// Add adds a new parameter to the parameter list.
+// Stores parameter name and value extracted from URL path.
+func (instance *Params) Add(key string, value string) {
+	instance.List = append(instance.List, Param{Key: key, Value: value})
 }
 
-// GetByName은 매개변수 이름으로 해당하는 값을 검색합니다.
-// 매개변수를 찾지 못하면 빈 문자열을 반환합니다.
-func (Instance *Params) GetByName(Name string) string {
-	for _, Param := range Instance.List {
-		if Param.Key == Name {
-			return Param.Value
+// GetByName searches for the corresponding value by parameter name.
+// Returns empty string if parameter is not found.
+func (instance *Params) GetByName(name string) string {
+	for _, param := range instance.List {
+		if param.Key == name {
+			return param.Value
 		}
 	}
 	return ""
 }
 
-// GetParamsFromCTX는 컨텍스트에서 매개변수를 추출합니다.
-// HTTP 핸들러에서 요청의 컨텍스트로부터 매개변수를 가져옵니다.
-func GetParamsFromCTX(Context context.Context) (*Params, bool) {
-	Temp, Success := (Context.Value(Key{})).(*Params)
-	return Temp, Success
+// GetParamsFromCTX extracts parameters from context.
+// Gets parameters from request context in HTTP handlers.
+func GetParamsFromCTX(ctx context.Context) (*Params, bool) {
+	temp, success := (ctx.Value(Key{})).(*Params)
+	return temp, success
 }
 
-// NewParamsPool은 새로운 매개변수 풀을 생성합니다.
-// 성능 최적화를 위해 sync.Pool을 사용하여 매개변수 객체를 재사용합니다.
-// 초기에 10개의 매개변수 객체를 미리 할당하여 풀에 넣어둡니다.
-// 웜업 예열(Warm-up): 초기 요청에서의 메모리 할당 지연을 방지합니다.
+// NewParamsPool creates a new parameter pool.
+// Uses sync.Pool to reuse parameter objects for performance optimization.
+// Pre-allocates 10 parameter objects initially and puts them in the pool.
+// Warm-up: Prevents memory allocation delays in initial requests.
 func NewParamsPool() *ParamsPool {
-	Instance := &ParamsPool{
+	instance := &ParamsPool{
 		Pool: &sync.Pool{
-			// Factory 함수: 풀이 비어있을 때 새로운 객체를 생성
+			// Factory function: Creates new object when pool is empty
 			New: func() any {
 				return NewParams()
 			},
 		},
 	}
-	// 수동 웜업: 10개 객체를 미리 생성하여 첫 번째 요청들의 레이턴시 감소
-	for Index := 0; Index < DefaultBufferSize; Index++ {
-		Instance.Put(NewParams())
+	// Manual warm-up: Pre-create 10 objects to reduce latency of first requests
+	for index := 0; index < DefaultBufferSize; index++ {
+		instance.Put(NewParams())
 	}
-	return Instance
+	return instance
 }
 
-// ParamsPool은 Params 객체를 재사용하기 위한 풀 구조체입니다.
-// 메모리 할당과 가비지 컨렉션 오버헤드를 줄이기 위해 sync.Pool을 사용합니다.
+// ParamsPool is a pool structure for reusing Params objects.
+// Uses sync.Pool to reduce memory allocation and garbage collection overhead.
 type ParamsPool struct {
-	Pool *sync.Pool // 매개변수 객체 풀
+	Pool *sync.Pool // Parameter object pool
 }
 
-// Get은 풀에서 매개변수 객체를 가져옵니다.
-// 기존 매개변수 리스트를 초기화하여 새로운 요청에서 사용할 수 있도록 준비합니다.
-// 메모리 효율성: 용량은 유지하고 길이만 0으로 리셋하여 재할당 없이 재사용
-func (Instance *ParamsPool) Get() *Params {
-	Object := Instance.Pool.Get().(*Params)
-	// 슬라이스 리셋: 기존 메모리를 유지하면서 길이만 0으로 설정 (성능 최적화)
-	Object.List = Object.List[:0]
-	return Object
+// Get retrieves a parameter object from the pool.
+// Initializes existing parameter list to prepare for use in new requests.
+// Memory efficiency: Maintains capacity and resets only length to 0 for reuse without reallocation
+func (instance *ParamsPool) Get() *Params {
+	object := instance.Pool.Get().(*Params)
+	// Slice reset: Maintains existing memory while setting length to 0 (performance optimization)
+	object.List = object.List[:0]
+	return object
 }
 
-// Put은 사용이 끝난 매개변수 객체를 풀에 반납합니다.
-// 메모리 누수를 방지하기 위해 리스트 용량이 8을 초과하면 새로운 슬라이스를 생성합니다.
-// 중요한 메모리 관리: 과도한 용량 증가를 방지하여 메모리 풀의 효율성 유지
-func (Instance *ParamsPool) Put(Object *Params) {
-	if Object != nil {
-		// 메모리 급증 방지: 용량이 임계값(8)을 초과하면 새 슬라이스 생성
-		// 이는 대량의 매개변수를 가진 요청 후 메모리가 계속 증가하는 것을 방지
-		if cap(Object.List) > MaxSize {
-			Object.List = make([]Param, 0, DefaultSize) // 기본 용량으로 리셋
+// Put returns a used parameter object to the pool.
+// Creates a new slice if list capacity exceeds 8 to prevent memory leaks.
+// Important memory management: Prevents excessive capacity growth to maintain memory pool efficiency
+func (instance *ParamsPool) Put(object *Params) {
+	if object != nil {
+		// Prevent memory surge: Create new slice if capacity exceeds threshold (8)
+		// This prevents continuous memory growth after requests with large parameters
+		if cap(object.List) > MaxSize {
+			object.List = make([]Param, 0, DefaultSize) // Reset to default capacity
 		}
-		Instance.Pool.Put(Object)
+		instance.Pool.Put(object)
 	}
 }
