@@ -21,10 +21,10 @@ type MethodType uint32
 // NodeType constants: Define various types of tree nodes.
 // Each node type affects routing performance and matching priority.
 const (
-	RootType       = iota // Root node ("/" path, starting point of tree)
-	StaticType            // Static path node (/users, /api, etc., fastest matching)
-	CatchAllType          // Catch-all node (*path, matches all remaining paths, low priority)
-	WildCardType          // Wildcard node (:param, single segment matching, medium priority)
+	RootType     = iota // Root node ("/" path, starting point of tree)
+	StaticType          // Static path node (/users, /api, etc., fastest matching)
+	CatchAllType        // Catch-all node (*path, matches all remaining paths, low priority)
+	WildCardType        // Wildcard node (:param, single segment matching, medium priority)
 )
 
 // Path pattern constants: Define special characters used in URL paths.

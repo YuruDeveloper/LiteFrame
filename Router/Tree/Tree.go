@@ -153,13 +153,8 @@ func (instance *Tree) InsertChild(parent *Node, path string) (*Node, error) {
 		child := NewNode(StaticType, path)
 		insertLocation := sort.Search(len(parent.Indices), func(index int) bool { return parent.Indices[index] >= path[0] })
 
-		parent.Indices = append(parent.Indices, 0)
-		copy(parent.Indices[insertLocation+1:], parent.Indices[insertLocation:])
-		parent.Indices[insertLocation] = path[0]
-
-		parent.Children = append(parent.Children, nil)
-		copy(parent.Children[insertLocation+1:], parent.Children[insertLocation:])
-		parent.Children[insertLocation] = child
+		parent.Indices = append(parent.Indices[:insertLocation],append([]byte{path[0]},parent.Indices[insertLocation:]...)...)
+		parent.Children = append(parent.Children[:insertLocation],append([]*Node{child},parent.Children[insertLocation:]...)...)
 		return child, nil
 	}
 }
@@ -170,7 +165,7 @@ func (instance *Tree) InsertChild(parent *Node, path string) (*Node, error) {
 //go:inline
 func (instance *Tree) SplitNode(parent *Node, child *Node, splitPoint int) (*Node, error) {
 	if splitPoint < 0 || splitPoint > len(child.Path) {
-		return  nil , Error.NewErrorWithCode(Error.InvalidSplitPoint,child.Path) 
+		return nil, Error.NewErrorWithCode(Error.InvalidSplitPoint, child.Path)
 	}
 	left := child.Path[:splitPoint]
 	right := child.Path[splitPoint:]
