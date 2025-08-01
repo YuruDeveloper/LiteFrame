@@ -85,7 +85,7 @@ func (instance *Tree) Match(sourcePath PathWithSegment, targetPath string) (bool
 	// Calculate common prefix length by sequential byte comparison
 	var index int
 	for index = 0; index < length; index++ {
-		if sourcePath.Body[sourcePath.Start+index] != targetPath[index] {
+		if sourcePath.Path[sourcePath.Start+index] != targetPath[index] {
 			break
 		}
 	}
@@ -223,7 +223,7 @@ func (instance *Tree) SetHandler(method MethodType, rawPath string, handler Hand
 			break
 		}
 		low , index , high := 0, 0, len(parent.Indices) -1
-		Target :=  path.Body[path.Start] 
+		Target :=  path.Path[path.Start] 
 		for low <= high {
 			index = (low + high) >> 1 
 			if parent.Indices[index] < Target {
@@ -240,24 +240,26 @@ func (instance *Tree) SetHandler(method MethodType, rawPath string, handler Hand
 				parent = parent.Children[index]
 				continue setHelper
 			}
-			if matchingPoint < len(parent.Children[index].Path) {
-				newParent, err := instance.SplitNode(parent, parent.Children[index], matchingPoint)
-				if err != nil {
-					return err
-				}
-				parent = newParent
-				if left.GetLength() > 0 {
-					path = &left
+			if matchingPoint > 0 {
+				if matchingPoint < len(parent.Children[index].Path) {
+					newParent, err := instance.SplitNode(parent, parent.Children[index], matchingPoint)
+					if err != nil {
+						return err
+					}
+					parent = newParent
+					if left.GetLength() > 0 {
+						path = &left
+						continue setHelper
+					}
+					path.Next()
 					continue setHelper
 				}
-				path.Next()
-				continue setHelper
+				parent = parent.Children[index]
+				path = &left
+				continue setHelper 
 			}
-			parent = parent.Children[index]
-			path = &left
-			continue setHelper
 		}
-		child, err := instance.InsertChild(parent, path.Body[path.Start:path.End])
+		child, err := instance.InsertChild(parent, path.Path[path.Start:path.End])
 		if err != nil {
 			return err
 		}
@@ -283,11 +285,11 @@ func (instance *Tree) GetHandler(request *http.Request, getParams func() *Param.
 	method := instance.StringToMethodType(request.Method)
 	var params *Param.Params
 	// Memory-efficient path processing using PathWithSegment
-	path := NewPathWithSegment(rawPath)
+ 	path := NewPathWithSegment(rawPath)
 	if method == NotAllowed {
 		return instance.NotAllowedHandler, nil
 	}
-	if path.Body == "/" || path.Body == "" {
+	if path.Path == "/" || path.Path == "" {
 		return instance.SelectHandler(instance.RootNode,method) , params
 	}
 	path.Next()
@@ -298,7 +300,7 @@ getHelper:
 			return instance.SelectHandler(parent, method), params
 		}
 		low , mid , high := 0, 0, len(parent.Indices) -1
-		Target := path.Body[path.Start]
+		Target := path.Path[path.Start]
 		for low <= high {
 			mid = (low + high) >> 1 
 			if parent.Indices[mid] < Target {
@@ -328,9 +330,10 @@ getHelper:
 		if parent.WildCard != nil {
 			if params == nil {
 				params = getParams()
+				params.Path = path.Path
 			}
 			// Store current segment as parameter and proceed to next segment
-			params.Add(parent.WildCard.Param, path.Body[path.Start:path.End])
+			params.Add(parent.WildCard.Param, path.Start,path.End)
 			path.Next()
 			parent = parent.WildCard
 			continue getHelper
@@ -339,9 +342,10 @@ getHelper:
 		if parent.CatchAll != nil {
 			if params == nil {
 				params = getParams()
+				params.Path = path.Path
 			}
 			// Store remaining path of PathWithSegment as single parameter
-			params.Add(parent.CatchAll.Param, path.Body[path.Start:])
+			params.Add(parent.CatchAll.Param, path.Start,path.PathLen)
 			path.Start = path.End
 			// Search handler in CatchAll node with empty path (path consumption complete)
 			parent = parent.CatchAll

@@ -22,8 +22,15 @@ func CreateBenchHandler() Tree.HandlerFunc {
 func CreateBenchHandlerWithParams() Tree.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 		if params != nil {
-			for _, param := range params.List {
-				_ = param.Value
+			// Process fixed parameters
+			for i := 0; i < params.Count && i < 2; i++ {
+				_ = params.Path[params.Fix[i].Start:params.Fix[i].End]
+			}
+			// Process overflow parameters
+			if params.Count > 2 {
+				for i := 0; i < len(params.Overflow); i++ {
+					_ = params.Path[params.Overflow[i].Start:params.Overflow[i].End]
+				}
 			}
 		}
 		w.WriteHeader(http.StatusOK)

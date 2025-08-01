@@ -7,8 +7,8 @@ package Tree
 // Initial state has both Start and End set to 0.
 func NewPathWithSegment(path string) *PathWithSegment {
 	return &PathWithSegment{
-		Body:    path,
-		BodyLen: len(path),
+		Path: path,
+		PathLen: len(path),
 		Start:   0,
 		End:     0,
 	}
@@ -22,8 +22,8 @@ func NewPathWithSegment(path string) *PathWithSegment {
 // - Iterator pattern: Sequential segment movement through Next()
 // - Boundary checking: Provides validation functions for safe index access
 type PathWithSegment struct {
-	Body    string // Original path string (immutable)
-	BodyLen int
+	Path    string // Original path string (immutable)
+	PathLen int
 	Start   int // Start index of current segment
 	End     int // End index of current segment (exclusive)
 }
@@ -43,7 +43,7 @@ func (instance *PathWithSegment) Next() {
 	}
 
 	// Skip consecutive path separators ('/')
-	for instance.BodyLen > instance.Start && instance.Body[instance.Start] == '/' {
+	for instance.PathLen > instance.Start && instance.Path[instance.Start] == '/' {
 		instance.Start++
 	}
 	if instance.IsEnd() {
@@ -52,7 +52,7 @@ func (instance *PathWithSegment) Next() {
 	}
 	// Set segment until next path separator or end of string
 	instance.End = instance.Start
-	for instance.End < instance.BodyLen && instance.Body[instance.End] != PathSeparator {
+	for instance.End < instance.PathLen && instance.Path[instance.End] != PathSeparator {
 		instance.End++
 	}
 }
@@ -62,7 +62,7 @@ func (instance *PathWithSegment) Next() {
 //
 //go:inline
 func (instance *PathWithSegment) IsEnd() bool {
-	return instance.Start >= instance.BodyLen
+	return instance.Start >= instance.PathLen
 }
 
 // IsSame checks if the current segment is empty.

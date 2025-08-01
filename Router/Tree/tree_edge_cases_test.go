@@ -68,7 +68,7 @@ func TestEdgeCases_Match(t *testing.T) {
 			}
 
 			matched, index, left := tree.Match(*pws, tc.Two)
-			remaining := left.Body[left.Start:left.End]
+			remaining := left.Path[left.Start:left.End]
 
 			if matched != tc.ExpectedMatch {
 				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
@@ -112,7 +112,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 					if pws.IsSame() {
 						break
 					}
-					segment := pws.Body[pws.Start:pws.End]
+					segment := pws.Path[pws.Start:pws.End]
 					if segment != "" {
 						result = append(result, segment)
 					}
@@ -155,7 +155,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 					if pws.IsSame() {
 						break
 					}
-					segment := pws.Body[pws.Start:pws.End]
+					segment := pws.Path[pws.Start:pws.End]
 					if segment != "" {
 						result = append(result, segment)
 					}

@@ -19,21 +19,21 @@ func TestNewParams(t *testing.T) {
 		}
 	})
 
-	t.Run("list_initialized", func(t *testing.T) {
-		if params.List == nil {
-			t.Error("Expected List to be initialized")
+	t.Run("path_initialized", func(t *testing.T) {
+		if params.Path != "" {
+			t.Error("Expected empty Path")
 		}
 	})
 
-	t.Run("list_empty", func(t *testing.T) {
-		if len(params.List) != 0 {
-			t.Errorf("Expected empty list, got length %d", len(params.List))
+	t.Run("count_zero", func(t *testing.T) {
+		if params.Count != 0 {
+			t.Errorf("Expected Count to be 0, got %d", params.Count)
 		}
 	})
 
-	t.Run("list_capacity", func(t *testing.T) {
-		if cap(params.List) != DefaultSize {
-			t.Errorf("Expected capacity %d, got %d", DefaultSize, cap(params.List))
+	t.Run("overflow_empty", func(t *testing.T) {
+		if params.Overflow != nil {
+			t.Error("Expected Overflow to be nil")
 		}
 	})
 }
@@ -43,70 +43,63 @@ func TestNewParams(t *testing.T) {
 // ======================
 
 func TestParamsAdd(t *testing.T) {
-	params := NewParams()
-
 	t.Run("add_single_param", func(t *testing.T) {
-		params.Add("id", "123")
+		params := NewParams()
+		params.Path = "/users/123/posts/456"
+		params.Add("id", 7, 10) // "123"
 
-		if len(params.List) != 1 {
-			t.Errorf("Expected 1 parameter, got %d", len(params.List))
+		if params.Count != 1 {
+			t.Errorf("Expected Count 1, got %d", params.Count)
 		}
 
-		if params.List[0].Key != "id" {
-			t.Errorf("Expected key 'id', got '%s'", params.List[0].Key)
+		if params.Fix[0].Key != "id" {
+			t.Errorf("Expected key 'id', got '%s'", params.Fix[0].Key)
 		}
 
-		if params.List[0].Value != "123" {
-			t.Errorf("Expected value '123', got '%s'", params.List[0].Value)
+		if params.Fix[0].Start != 7 || params.Fix[0].End != 10 {
+			t.Errorf("Expected Start:7, End:10, got Start:%d, End:%d", params.Fix[0].Start, params.Fix[0].End)
 		}
 	})
 
 	t.Run("add_multiple_params", func(t *testing.T) {
 		params := NewParams()
-		params.Add("id", "123")
-		params.Add("name", "test")
-		params.Add("category", "books")
+		params.Path = "/users/123/posts/456/category/books"
+		params.Add("id", 7, 10)       // "123"
+		params.Add("postId", 17, 20)  // "456"
+		params.Add("category", 30, 35) // "books"
 
-		if len(params.List) != 3 {
-			t.Errorf("Expected 3 parameters, got %d", len(params.List))
+		if params.Count != 3 {
+			t.Errorf("Expected Count 3, got %d", params.Count)
 		}
 
-		expectedParams := []Param{
-			{Key: "id", Value: "123"},
-			{Key: "name", Value: "test"},
-			{Key: "category", Value: "books"},
+		// Check fixed parameters (first 2)
+		if params.Fix[0].Key != "id" {
+			t.Errorf("Expected key 'id', got '%s'", params.Fix[0].Key)
+		}
+		if params.Fix[1].Key != "postId" {
+			t.Errorf("Expected key 'postId', got '%s'", params.Fix[1].Key)
 		}
 
-		for i, expected := range expectedParams {
-			if params.List[i].Key != expected.Key {
-				t.Errorf("Expected key '%s' at index %d, got '%s'", expected.Key, i, params.List[i].Key)
-			}
-			if params.List[i].Value != expected.Value {
-				t.Errorf("Expected value '%s' at index %d, got '%s'", expected.Value, i, params.List[i].Value)
-			}
+		// Check overflow parameter (3rd)
+		if len(params.Overflow) != 1 {
+			t.Errorf("Expected 1 overflow parameter, got %d", len(params.Overflow))
+		}
+		if params.Overflow[0].Key != "category" {
+			t.Errorf("Expected overflow key 'category', got '%s'", params.Overflow[0].Key)
 		}
 	})
 
-	t.Run("add_empty_values", func(t *testing.T) {
+	t.Run("add_empty_key", func(t *testing.T) {
 		params := NewParams()
-		params.Add("", "")
-		params.Add("key", "")
-		params.Add("", "value")
+		params.Path = "/users/123"
+		params.Add("", 7, 10)
 
-		if len(params.List) != 3 {
-			t.Errorf("Expected 3 parameters, got %d", len(params.List))
+		if params.Count != 1 {
+			t.Errorf("Expected Count 1, got %d", params.Count)
 		}
 
-		if params.List[0].Key != "" || params.List[0].Value != "" {
-			t.Error("Expected empty key and value")
-		}
-
-		if params.List[1].Key != "key" || params.List[1].Value != "" {
-			t.Error("Expected key 'key' and empty value")
-		}
-
-		if params.List[2].Key != "" || params.List[2].Value != "value" {
-			t.Error("Expected empty key and value 'value'")
+		if params.Fix[0].Key != "" {
+			t.Errorf("Expected empty key, got '%s'", params.Fix[0].Key)
 		}
 	})
 }
@@ -118,8 +111,9 @@ func TestParamsAdd(t *testing.T) {
 func TestParamsGetByName(t *testing.T) {
 	t.Run("existing_param", func(t *testing.T) {
 		params := NewParams()
-		params.Add("id", "123")
-		params.Add("name", "test")
+		params.Path = "/users/123/posts/test"
+		params.Add("id", 7, 10)     // "123"
+		params.Add("name", 17, 21)  // "test"
 
 		value := params.GetByName("id")
 		if value != "123" {
@@ -134,7 +128,8 @@ func TestParamsGetByName(t *testing.T) {
 
 	t.Run("non_existing_param", func(t *testing.T) {
 		params := NewParams()
-		params.Add("id", "123")
+		params.Path = "/users/123"
+		params.Add("id", 7, 10) // "123"
 
 		value := params.GetByName("name")
 		if value != "" {
@@ -144,6 +139,7 @@ func TestParamsGetByName(t *testing.T) {
 
 	t.Run("empty_params", func(t *testing.T) {
 		params := NewParams()
+		params.Path = "/users"
 
 		value := params.GetByName("id")
 		if value != "" {
@@ -151,21 +147,23 @@ func TestParamsGetByName(t *testing.T) {
 		}
 	})
 
-	t.Run("duplicate_keys", func(t *testing.T) {
+	t.Run("overflow_param", func(t *testing.T) {
 		params := NewParams()
-		params.Add("id", "first")
-		params.Add("id", "second")
+		params.Path = "/users/123/posts/456/category/books"
+		params.Add("id", 7, 10)       // "123" (Fix[0])
+		params.Add("postId", 17, 20)  // "456" (Fix[1])
+		params.Add("category", 30, 35) // "books" (Overflow[0])
 
-		// Should return the first match
-		value := params.GetByName("id")
-		if value != "first" {
-			t.Errorf("Expected 'first', got '%s'", value)
+		value := params.GetByName("category")
+		if value != "books" {
+			t.Errorf("Expected 'books', got '%s'", value)
 		}
 	})
 
 	t.Run("case_sensitive", func(t *testing.T) {
 		params := NewParams()
-		params.Add("ID", "123")
+		params.Path = "/users/123"
+		params.Add("ID", 7, 10) // "123"
 
 		value := params.GetByName("id")
 		if value != "" {
@@ -186,7 +184,8 @@ func TestParamsGetByName(t *testing.T) {
 func TestGetParamsFromCTX(t *testing.T) {
 	t.Run("existing_params_in_context", func(t *testing.T) {
 		params := NewParams()
-		params.Add("id", "123")
+		params.Path = "/users/123"
+		params.Add("id", 7, 10) // "123"
 
 		ctx := context.WithValue(context.Background(), Key{}, params)
 
@@ -199,8 +198,8 @@ func TestGetParamsFromCTX(t *testing.T) {
 			t.Fatal("Expected non-nil params")
 		}
 
-		if len(retrievedParams.List) != 1 {
-			t.Errorf("Expected 1 parameter, got %d", len(retrievedParams.List))
+		if retrievedParams.Count != 1 {
+			t.Errorf("Expected Count 1, got %d", retrievedParams.Count)
 		}
 
 		if retrievedParams.GetByName("id") != "123" {
@@ -305,26 +304,29 @@ func TestParamsPoolGet(t *testing.T) {
 			return
 		}
 
-		if params.List == nil {
-			t.Error("Expected List to be initialized")
-			return
+		if params.Count != 0 {
+			t.Errorf("Expected Count 0, got %d", params.Count)
 		}
 
-		if len(params.List) != 0 {
-			t.Errorf("Expected empty list, got length %d", len(params.List))
+		if params.Path != "" {
+			t.Errorf("Expected empty Path, got '%s'", params.Path)
 		}
 	})
 
 	t.Run("get_resets_existing_params", func(t *testing.T) {
 		params := pool.Get()
-		params.Add("test", "value")
+		params.Path = "/test/value"
+		params.Add("test", 6, 11) // "value"
 
 		// Put it back and get it again
 		pool.Put(params)
 		resetParams := pool.Get()
 
-		if len(resetParams.List) != 0 {
-			t.Errorf("Expected reset list to be empty, got length %d", len(resetParams.List))
+		if resetParams.Count != 0 {
+			t.Errorf("Expected reset Count to be 0, got %d", resetParams.Count)
+		}
+		if resetParams.Path != "" {
+			t.Errorf("Expected reset Path to be empty, got '%s'", resetParams.Path)
 		}
 	})
 
@@ -338,9 +340,14 @@ func TestParamsPoolGet(t *testing.T) {
 		}
 
 		// They should all be independent
-		params1.Add("key1", "value1")
-		params2.Add("key2", "value2")
-		params3.Add("key3", "value3")
+		params1.Path = "/test/value1"
+		params1.Add("key1", 6, 12) // "value1"
+		
+		params2.Path = "/test/value2"
+		params2.Add("key2", 6, 12) // "value2"
+		
+		params3.Path = "/test/value3"
+		params3.Add("key3", 6, 12) // "value3"
 
 		if params1.GetByName("key2") != "" || params1.GetByName("key3") != "" {
 			t.Error("Expected params1 to only contain its own data")
@@ -371,51 +378,54 @@ func TestParamsPoolPut(t *testing.T) {
 
 	t.Run("put_and_get_cycle", func(t *testing.T) {
 		params := pool.Get()
-		params.Add("test", "value")
+		params.Path = "/test/value"
+		params.Add("test", 6, 11) // "value"
 
 		pool.Put(params)
 
 		retrievedParams := pool.Get()
-		if len(retrievedParams.List) != 0 {
-			t.Errorf("Expected retrieved params to be reset, got length %d", len(retrievedParams.List))
+		if retrievedParams.Count != 0 {
+			t.Errorf("Expected retrieved params Count to be 0, got %d", retrievedParams.Count)
+		}
+		if retrievedParams.Path != "" {
+			t.Errorf("Expected retrieved params Path to be empty, got '%s'", retrievedParams.Path)
 		}
 	})
 
 	t.Run("put_large_capacity_params", func(t *testing.T) {
 		params := pool.Get()
 
-		// Add many parameters to exceed MaxSize capacity
+		// Add many parameters to exceed MaxSize capacity in overflow
 		for i := 0; i < MaxSize+5; i++ {
-			params.Add("key", "value")
+			params.Add("key", 6, 11) // "value"
 		}
 
-		originalCap := cap(params.List)
+		originalCap := cap(params.Overflow)
 		if originalCap <= MaxSize {
-			t.Skipf("Capacity %d not large enough to test capacity reset", originalCap)
+			t.Skipf("Overflow capacity %d not large enough to test capacity reset", originalCap)
 		}
 
 		pool.Put(params)
 
-		// Get it back and check if capacity was reset
+		// Get it back and check if overflow capacity was reset
 		retrievedParams := pool.Get()
-		if cap(retrievedParams.List) != DefaultSize {
-			t.Errorf("Expected capacity to be reset to %d, got %d", DefaultSize, cap(retrievedParams.List))
+		if cap(retrievedParams.Overflow) > MaxSize {
+			t.Errorf("Expected overflow capacity to be reset to 0, got %d", cap(retrievedParams.Overflow))
 		}
 	})
 
 	t.Run("put_normal_capacity_params", func(t *testing.T) {
 		params := pool.Get()
-		params.Add("key1", "value1")
-		params.Add("key2", "value2")
-
-		originalCap := cap(params.List)
+		params.Path = "/test/value1/value2"
+		params.Add("key1", 6, 12)   // "value1"
+		params.Add("key2", 13, 19)  // "value2"
 
 		pool.Put(params)
 		retrievedParams := pool.Get()
 
-		// Capacity should be preserved if under MaxSize
-		if cap(retrievedParams.List) < originalCap {
-			t.Errorf("Expected capacity to be preserved, original: %d, retrieved: %d", originalCap, cap(retrievedParams.List))
+		// Overflow capacity should be preserved if under MaxSize
+		if len(params.Overflow) <= MaxSize && cap(retrievedParams.Overflow) > MaxSize {
+			t.Errorf("Expected normal capacity to be preserved")
 		}
 	})
 }
@@ -439,8 +449,9 @@ func TestParamsPoolConcurrency(t *testing.T) {
 
 				for j := 0; j < numOperations; j++ {
 					params := pool.Get()
-					params.Add("id", "test")
-					params.Add("value", "data")
+					params.Path = "/users/test/data"
+					params.Add("id", 7, 11)     // "test"
+					params.Add("value", 12, 16) // "data"
 
 					// Verify the params work correctly
 					if params.GetByName("id") != "test" {
@@ -466,7 +477,8 @@ func TestParamsEdgeCases(t *testing.T) {
 		longKey := string(make([]byte, 1000))
 		longValue := string(make([]byte, 1000))
 
-		params.Add(longKey, longValue)
+		params.Path = "/" + longValue
+		params.Add(longKey, 1, 1001) // longValue from position 1 to 1001
 
 		if params.GetByName(longKey) != longValue {
 			t.Error("Failed to handle very long key/value pairs")
@@ -475,8 +487,9 @@ func TestParamsEdgeCases(t *testing.T) {
 
 	t.Run("unicode_characters", func(t *testing.T) {
 		params := NewParams()
-		params.Add("한글키", "한글값")
-		params.Add("🔑", "🎯")
+		params.Path = "/한글값/🎯"
+		params.Add("한글키", 1, 10)  // "한글값" (UTF-8 bytes)
+		params.Add("🔑", 11, 15)    // "🎯" (UTF-8 bytes)
 
 		if params.GetByName("한글키") != "한글값" {
 			t.Error("Failed to handle Korean characters")
@@ -489,9 +502,10 @@ func TestParamsEdgeCases(t *testing.T) {
 
 	t.Run("special_characters", func(t *testing.T) {
 		params := NewParams()
-		params.Add("key with spaces", "value with spaces")
-		params.Add("key/with/slashes", "value/with/slashes")
-		params.Add("key?with&query", "value=with=equals")
+		params.Path = "/value with spaces/value/with/slashes/value=with=equals"
+		params.Add("key with spaces", 1, 18)    // "value with spaces"
+		params.Add("key/with/slashes", 19, 37)  // "value/with/slashes"
+		params.Add("key?with&query", 38, 55)    // "value=with=equals"
 
 		if params.GetByName("key with spaces") != "value with spaces" {
 			t.Error("Failed to handle spaces")

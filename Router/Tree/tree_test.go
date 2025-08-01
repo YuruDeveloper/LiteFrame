@@ -68,7 +68,7 @@ func TestPathWithSegment(t *testing.T) {
 				if pws.IsSame() {
 					break
 				}
-				segment := pws.Body[pws.Start:pws.End]
+				segment := pws.Path[pws.Start:pws.End]
 				if segment != "" {
 					result = append(result, segment)
 				}
@@ -206,7 +206,7 @@ func TestMatch(t *testing.T) {
 			}
 
 			matched, index, leftPws := tree.Match(*pws, test.Two)
-			left := leftPws.Body[leftPws.Start:leftPws.End]
+			left := leftPws.Path[leftPws.Start:leftPws.End]
 
 			if matched != test.ExpectedMatch {
 				t.Errorf("Expected match %v, got %v", test.ExpectedMatch, matched)
@@ -365,40 +365,3 @@ func TestSplitNode(t *testing.T) {
 		}
 	})
 }
-
-// ======================
-// Pattern Matching Tests (Commented out as TryMatch method was removed)
-// ======================
-
-// func TestTryMatch(t *testing.T) {
-// 	tree := SetupTree()
-// 	handler := CreateTestHandler()
-//
-// 	t.Run("no_children", func(t *testing.T) {
-// 		parent := NewNode(RootType, "/")
-// 		pws := NewPathWithSegment("/users")
-// 		pws.Next() // Move to the first segment
-//
-// 		matched, err := tree.TryMatch(parent, pws, GET, handler)
-// 		AssertNoError(t, err, "TryMatch")
-//
-// 		if matched {
-// 			t.Error("Expected no match, got match")
-// 		}
-// 	})
-//
-// 	t.Run("exact_match", func(t *testing.T) {
-// 		parent := NewNode(RootType, "/")
-// 		child := NewNode(StaticType, "users")
-// 		parent.Children = append(parent.Children, child)
-// 		pws := NewPathWithSegment("/users/123")
-// 		pws.Next() // Move to the first segment
-//
-// 		matched, err := tree.TryMatch(parent, pws, GET, handler)
-// 		AssertNoError(t, err, "TryMatch")
-//
-// 		if !matched {
-// 			t.Error("Expected match, got no match")
-// 		}
-// 	})
-// }

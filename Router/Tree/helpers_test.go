@@ -27,8 +27,17 @@ func CreateHandlerWithResponse(response string) HandlerFunc {
 // CreateParamCheckHandler creates a test handler that validates parameters
 func CreateParamCheckHandler(expectedParams map[string]string) HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
+		if params == nil && len(expectedParams) > 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("params is nil but expected parameters"))
+			return
+		}
+		
 		for key, expectedValue := range expectedParams {
-			actualValue := params.GetByName(key)
+			actualValue := ""
+			if params != nil {
+				actualValue = params.GetByName(key)
+			}
 			if actualValue != expectedValue {
 				w.WriteHeader(http.StatusInternalServerError)
 				_, _ = w.Write([]byte("param mismatch: " + key))
