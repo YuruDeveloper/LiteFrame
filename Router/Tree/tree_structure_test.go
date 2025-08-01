@@ -75,7 +75,7 @@ func TestTreeStructure(t *testing.T) {
 		err := tree.SetHandler(tree.StringToMethodType("GET"), "/files/*path", handler)
 		AssertNoError(t, err, "SetHandler")
 
-		// 캐치올 구조 검증
+		// Validate catch-all structure
 		filesNode := findChildNode(tree.RootNode, "files")
 		if filesNode == nil {
 			t.Fatal("Files node not found")
@@ -99,11 +99,11 @@ func TestTreeStructure(t *testing.T) {
 		handler := CreateTestHandler()
 
 		routes := []RouteConfig{
-			{"GET", "/", handler},                    // 루트
-			{"GET", "/api/users", handler},           // 정적
-			{"GET", "/api/users/:id", handler},       // 와일드카드
-			{"GET", "/api/users/:id/posts", handler}, // 중첩 와일드카드
-			{"GET", "/static/*files", handler},       // 캐치올
+			{"GET", "/", handler},                    // Root
+			{"GET", "/api/users", handler},           // Static
+			{"GET", "/api/users/:id", handler},       // Wildcard
+			{"GET", "/api/users/:id/posts", handler}, // Nested wildcard
+			{"GET", "/static/*files", handler},       // Catch-all
 		}
 
 		for _, route := range routes {
@@ -111,7 +111,7 @@ func TestTreeStructure(t *testing.T) {
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
-		// 기본 구조 검증
+		// Validate basic structure
 		if tree.RootNode.Handlers[GET] == nil {
 			t.Error("Root handler not set")
 		}
@@ -123,7 +123,7 @@ func TestTreeStructure(t *testing.T) {
 
 		staticNode := findChildNode(tree.RootNode, "static")
 		if staticNode == nil {
-			t.Error("Static node not found")
+			t.Fatal("Static node not found")
 		}
 
 		if staticNode.CatchAll == nil {
@@ -133,7 +133,7 @@ func TestTreeStructure(t *testing.T) {
 }
 
 // ======================
-// 트리 일관성 검증 테스트
+// Tree Consistency Validation Tests
 // ======================
 
 func TestTreeConsistency(t *testing.T) {
@@ -172,10 +172,10 @@ func TestTreeConsistency(t *testing.T) {
 }
 
 // ======================
-// Helper 함수들
+// Helper Functions
 // ======================
 
-// findChildNode는 자식 노드들 중에서 지정된 경로를 가진 노드를 찾습니다
+// findChildNode finds a node with the specified path among child nodes
 func findChildNode(parent *Node, path string) *Node {
 	for _, child := range parent.Children {
 		if child.Path == path {
@@ -185,14 +185,14 @@ func findChildNode(parent *Node, path string) *Node {
 	return nil
 }
 
-// checkNodeConsistency는 노드의 일관성을 재귀적으로 확인합니다
+// checkNodeConsistency recursively validates node consistency
 func checkNodeConsistency(t *testing.T, node *Node, path string) {
 	if node == nil {
 		t.Errorf("Node at path %s is nil", path)
 		return
 	}
 
-	// 자식 노드 검증
+	// Validate child nodes
 	for _, child := range node.Children {
 		if child == nil {
 			t.Errorf("Child node is nil at path %s", path)
@@ -207,7 +207,7 @@ func checkNodeConsistency(t *testing.T, node *Node, path string) {
 		checkNodeConsistency(t, child, childPath)
 	}
 
-	// 와일드카드 노드 검증
+	// Validate wildcard node
 	if node.WildCard != nil {
 		wildcardPath := path + "/" + node.WildCard.Path
 		if path == "/" {
@@ -216,7 +216,7 @@ func checkNodeConsistency(t *testing.T, node *Node, path string) {
 		checkNodeConsistency(t, node.WildCard, wildcardPath)
 	}
 
-	// 캐치올 노드 검증
+	// Validate catch-all node
 	if node.CatchAll != nil {
 		catchAllPath := path + "/" + node.CatchAll.Path
 		if path == "/" {
@@ -227,7 +227,7 @@ func checkNodeConsistency(t *testing.T, node *Node, path string) {
 }
 
 // ======================
-// 트리 무결성 검증 테스트
+// Tree Integrity Validation Tests
 // ======================
 
 func TestTreeIntegrity(t *testing.T) {
@@ -236,14 +236,14 @@ func TestTreeIntegrity(t *testing.T) {
 		handler1 := CreateHandlerWithResponse("handler1")
 		handler2 := CreateHandlerWithResponse("handler2")
 
-		// 같은 경로에 핸들러 두 번 설정
+		// Set handler twice on same path
 		err := tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler1)
 		AssertNoError(t, err, "First SetHandler")
 
 		err = tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler2)
-		AssertNoError(t, err, "Second SetHandler") // 덮어쓰기 허용
+		AssertNoError(t, err, "Second SetHandler") // Allow overwrite
 
-		// 두 번째 핸들러가 설정되었는지 확인
+		// Verify second handler is set
 		recorder := ExecuteRequest(tree, "GET", "/test")
 		AssertStatusCode(t, recorder, 200)
 		AssertResponseBody(t, recorder, "handler2")
@@ -253,11 +253,11 @@ func TestTreeIntegrity(t *testing.T) {
 		tree := SetupTree()
 		handler := CreateTestHandler()
 
-		// 충돌 가능한 경로들
+		// Potentially conflicting paths
 		routes := []RouteConfig{
-			{"GET", "/users/admin", handler},    // 정적
-			{"GET", "/users/:id", handler},      // 와일드카드
-			{"GET", "/users/:id/edit", handler}, // 와일드카드 + 정적
+			{"GET", "/users/admin", handler},    // Static
+			{"GET", "/users/:id", handler},      // Wildcard
+			{"GET", "/users/:id/edit", handler}, // Wildcard + Static
 		}
 
 		for _, route := range routes {
@@ -265,7 +265,7 @@ func TestTreeIntegrity(t *testing.T) {
 			AssertNoError(t, err, "SetHandler for "+route.Path)
 		}
 
-		// 정적 라우트가 우선되는지 확인
+		// Verify static route takes precedence
 		usersNode := findChildNode(tree.RootNode, "users")
 		if usersNode == nil {
 			t.Fatal("Users node not found")

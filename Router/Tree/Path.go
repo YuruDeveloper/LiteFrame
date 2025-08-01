@@ -35,6 +35,7 @@ type PathWithSegment struct {
 // 1. Set current End position as new Start
 // 2. Skip consecutive '/' characters
 // 3. Set next segment until next '/' or end of string
+//go:noinline
 func (instance *PathWithSegment) Next() {
 	instance.Start = instance.End
 	if instance.IsEnd() {
@@ -72,27 +73,7 @@ func (instance *PathWithSegment) IsSame() bool {
 	return instance.Start == instance.End
 }
 
-// IsNotValid checks if the current index state is invalid.
-// Checks for end of path, index out of bounds, and logical errors.
-func (instance *PathWithSegment) IsNotValid() bool {
-	return instance.IsEnd() || instance.End > len(instance.Body) || instance.Start > instance.End
-}
 
-// Get returns the string of the current segment.
-// Returns empty string if in invalid state.
-// Memory allocation: Creates new string (call only when necessary)
-func (instance *PathWithSegment) Get() string {
-	if instance.IsNotValid() {
-		return ""
-	}
-	return string(instance.Body[instance.Start:instance.End])
-}
-
-// GetToEnd returns the string from current position to end of path.
-// Used by CatchAll routes to capture all remaining path.
-func (instance *PathWithSegment) GetToEnd() string {
-	return string(instance.Body[instance.Start:])
-}
 
 // GetLength returns the length of the current segment.
 // Memory efficient as it calculates length without creating strings.

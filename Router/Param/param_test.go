@@ -302,10 +302,12 @@ func TestParamsPoolGet(t *testing.T) {
 
 		if params == nil {
 			t.Error("Expected non-nil Params from pool")
+			return
 		}
 
 		if params.List == nil {
 			t.Error("Expected List to be initialized")
+			return
 		}
 
 		if len(params.List) != 0 {
@@ -359,6 +361,11 @@ func TestParamsPoolPut(t *testing.T) {
 
 	t.Run("put_nil_params", func(t *testing.T) {
 		// Should not panic
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("The code panicked when putting nil into the pool: %v", r)
+			}
+		}()
 		pool.Put(nil)
 	})
 

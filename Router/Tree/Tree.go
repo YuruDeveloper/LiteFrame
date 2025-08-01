@@ -77,7 +77,6 @@ func (instance *Tree) StringToMethodType(method string) MethodType {
 // Returns: (complete match, matched index, remaining PathWithSegment)
 // Optimized matching algorithm based on PathWithSegment.
 //
-//go:inline
 func (instance *Tree) Match(sourcePath PathWithSegment, targetPath string) (bool, int, PathWithSegment) {
 	// Set comparison range based on shorter length between PathWithSegment and string
 
@@ -105,6 +104,7 @@ func (instance *Tree) Match(sourcePath PathWithSegment, targetPath string) (bool
 // SelectHandler selects method-appropriate handler from node and injects parameters into context.
 // Returns NotAllowedHandler if handler not found.
 // Important: Core function handling both memory pool management and context injection.
+//go:noinline
 func (instance *Tree) SelectHandler(node *Node, method MethodType) HandlerFunc {
 	if handler := node.Handlers[method]; handler != nil {
 		// Inject parameters into context through closure and ensure memory pool return
@@ -117,14 +117,14 @@ func (instance *Tree) SelectHandler(node *Node, method MethodType) HandlerFunc {
 // Returns error if duplicate parameter names exist.
 // Functional programming pattern: Eliminates duplicate code using higher-order functions
 
-func (instance *Tree) InsertUniqueTypeChild(parent *Node, path string, target *Node, nodeType NodeType, errorFn func(string) error, setFn func(*Node, *Node)) (*Node, error) {
+func (instance *Tree) InsertUniqueTypeChild(parent *Node, path string, target *Node, nodeType NodeType, errorCode error, setFn func(*Node, *Node)) (*Node, error) {
 	switch {
 	// Validate empty parameter name (cases with only ":" or "*")
 	case path[1:] == "":
 		return nil, Error.NewErrorWithCode(Error.NilParameter, path)
 	// Conflict error for same type but different parameter name
 	case target != nil && target.Param != path[1:]:
-		return nil, errorFn(path)
+		return nil, errorCode
 	// Reuse if node with same parameter name already exists
 	case target != nil && target.Param == path[1:]:
 		return target, nil
@@ -139,15 +139,16 @@ func (instance *Tree) InsertUniqueTypeChild(parent *Node, path string, target *N
 
 // InsertChild inserts child node into parent node.
 // Creates Static, WildCard, or CatchAll nodes based on path type.
+//go:noinline
 func (instance *Tree) InsertChild(parent *Node, path string) (*Node, error) {
 	switch {
 	case instance.IsWildCard(path):
 		return instance.InsertUniqueTypeChild(parent, path, parent.WildCard, WildCardType,
-			func(path string) error { return Error.NewErrorWithCode(Error.DuplicateWildCard, path) },
+			Error.NewErrorWithCode(Error.DuplicateWildCard, path) ,
 			func(parent, child *Node) { parent.WildCard = child })
 	case instance.IsCatchAll(path):
 		return instance.InsertUniqueTypeChild(parent, path, parent.CatchAll, CatchAllType,
-			func(path string) error { return Error.NewErrorWithCode(Error.DuplicateCatchAll, path) },
+			Error.NewErrorWithCode(Error.DuplicateCatchAll, path) ,
 			func(parent, child *Node) { parent.CatchAll = child })
 	default:
 		child := NewNode(StaticType, path)
@@ -180,11 +181,8 @@ func (instance *Tree) SplitNode(parent *Node, child *Node, splitPoint int) (*Nod
 				newParent.Indices = []byte{right[0]}
 				child.Path = right
 				newParent.Children = []*Node{child}
-			} else {
-				child.Path = right
-				newParent.Indices = []byte{}
-				newParent.Children = []*Node{}
-			}
+			} 
+			break
 		}
 	}
 	return newParent, nil
@@ -199,6 +197,7 @@ func (instance *Tree) SplitNode(parent *Node, child *Node, splitPoint int) (*Nod
 // 3. Complete match: Move to next segment
 // 4. Partial match: Split node then continue
 // 5. Match failure: Create new child node
+//go:noinline
 func (instance *Tree) SetHandler(method MethodType, rawPath string, handler HandlerFunc) error {
 	if rawPath == "" {
 		return Error.NewErrorWithCode(Error.InvalidParameter, rawPath)
@@ -250,7 +249,7 @@ setHelper:
 			path = &left
 			continue setHelper
 		}
-		child, err := instance.InsertChild(parent, path.Get())
+		child, err := instance.InsertChild(parent, path.Body[path.Start:path.End])
 		if err != nil {
 			return err
 		}
@@ -270,6 +269,7 @@ setHelper:
 // 3. CatchAll nodes: All remaining paths (*path, lowest priority)
 //
 // Returns: (handler function, parameter object) - returns nil if no parameters
+//go:noinline
 func (instance *Tree) GetHandler(request *http.Request, getParams func() *Param.Params) (HandlerFunc, *Param.Params) {
 	rawPath := request.URL.Path
 	method := instance.StringToMethodType(request.Method)
@@ -286,20 +286,22 @@ getHelper:
 		if path.GetLength() == 0 {
 			return instance.SelectHandler(node, method), params
 		}
+		index := sort.Search(len(node.Indices), func(i int) bool {
+			return node.Indices[i] >= path.Body[path.Start]
+		})
 
-		for index := 0; index < len(node.Indices); index++ {
-			if path.Body[path.Start] == node.Indices[index] {
-				matched, matchingPoint, left := instance.Match(*path, node.Children[index].Path)
-				switch {
-				case matched:
-					path.Next()
-					node = node.Children[index]
-					continue getHelper
-				case matchingPoint > 0 && matchingPoint == len(node.Children[index].Path) && path.GetLength() > 0:
-					node = node.Children[index]
-					path = &left
-					continue getHelper
-				}
+		if index < len(node.Indices) && node.Indices[index] == path.Body[path.Start] {
+			childNode := node.Children[index]
+			matched, matchingPoint, left := instance.Match(*path, childNode.Path)
+			switch {
+			case matched:
+				path.Next()
+				node = childNode
+				continue getHelper
+			case matchingPoint > 0 && matchingPoint == len(childNode.Path) && path.GetLength() > 0:
+				node = childNode
+				path = &left
+				continue getHelper
 			}
 		}
 		// 2nd priority: WildCard node matching (single segment capture)
@@ -308,7 +310,7 @@ getHelper:
 				params = getParams()
 			}
 			// Store current segment as parameter and proceed to next segment
-			params.Add(node.WildCard.Param, path.Get())
+			params.Add(node.WildCard.Param, path.Body[path.Start:path.End])
 			path.Next()
 			node = node.WildCard
 			continue getHelper
@@ -319,7 +321,7 @@ getHelper:
 				params = getParams()
 			}
 			// Store remaining path of PathWithSegment as single parameter
-			params.Add(node.CatchAll.Param, path.GetToEnd())
+			params.Add(node.CatchAll.Param, path.Body[path.Start:])
 			path.Start = path.End
 			// Search handler in CatchAll node with empty path (path consumption complete)
 			node = node.CatchAll
@@ -362,6 +364,7 @@ func (instance *Tree) ApplyMiddleware(handler HandlerFunc) HandlerFunc {
 
 // ServeHTTP implements http.Handler interface.
 // Finds handler for request, applies middleware, then executes.
+//go:noinline
 func (instance *Tree) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	handler, params := instance.GetHandler(request, instance.Pool.Get)
 	handler = instance.ApplyMiddleware(handler)

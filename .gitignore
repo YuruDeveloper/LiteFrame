@@ -4,6 +4,7 @@
 *.so
 *.dylib
 
+*.png
 *.prof
 *.html
 *.test
@@ -21,4 +22,3 @@ CLAUDE.md
 Temp/
 GEMINI.md
 node_modules
-qwert

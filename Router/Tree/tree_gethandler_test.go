@@ -52,7 +52,7 @@ func TestGetHandler(t *testing.T) {
 		}
 	})
 
-	// 와일드카드 매개변수 테스트
+	// Wildcard parameter tests
 	t.Run("wildcard_parameters", func(t *testing.T) {
 		t.Run("single_wildcard", func(t *testing.T) {
 			tree := SetupTree()
@@ -84,7 +84,7 @@ func TestGetHandler(t *testing.T) {
 		})
 	})
 
-	// 캐치올 경로 테스트
+	// Catch-all path tests
 	t.Run("catch_all_paths", func(t *testing.T) {
 		tree := SetupTree()
 		expectedParams := map[string]string{"path": "static/css/main.css"}
@@ -98,13 +98,13 @@ func TestGetHandler(t *testing.T) {
 		AssertResponseBody(t, recorder, "params matched")
 	})
 
-	// 에러 처리 테스트
+	// Error handling tests
 	t.Run("error_handling", func(t *testing.T) {
 		t.Run("not_found", func(t *testing.T) {
 			tree := SetupTree()
 			tree.NotFoundHandler = func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("not found"))
+				_, _ = w.Write([]byte("not found"))
 			}
 
 			recorder := ExecuteRequest(tree, "GET", "/nonexistent")
@@ -116,7 +116,7 @@ func TestGetHandler(t *testing.T) {
 			tree := SetupTree()
 			tree.NotAllowedHandler = func(w http.ResponseWriter, r *http.Request, params *Param.Params) {
 				w.WriteHeader(http.StatusMethodNotAllowed)
-				w.Write([]byte("method not allowed"))
+				_, _ = w.Write([]byte("method not allowed"))
 			}
 
 			handler := CreateHandlerWithResponse("post response")
@@ -129,7 +129,7 @@ func TestGetHandler(t *testing.T) {
 		})
 	})
 
-	// HTTP 메서드 테스트
+	// HTTP method tests
 	t.Run("multiple_methods", func(t *testing.T) {
 		tree := SetupTree()
 
@@ -141,44 +141,44 @@ func TestGetHandler(t *testing.T) {
 		_, err := SetupTreeWithRoutes(routes)
 		AssertNoError(t, err, "SetupTreeWithRoutes")
 
-		// GET 요청 테스트
+		// GET request test
 		for _, route := range routes {
 			err := tree.SetHandler(tree.StringToMethodType(route.Method), route.Path, route.Handler)
 			AssertNoError(t, err, "SetHandler")
 		}
 
-		// GET 테스트
+		// GET test
 		recorder := ExecuteRequest(tree, "GET", "/users")
 		AssertStatusCode(t, recorder, http.StatusOK)
 		AssertResponseBody(t, recorder, "GET response")
 
-		// POST 테스트
+		// POST test
 		recorder = ExecuteRequest(tree, "POST", "/users")
 		AssertStatusCode(t, recorder, http.StatusOK)
 		AssertResponseBody(t, recorder, "POST response")
 	})
 
-	// 라우팅 우선순위 테스트
+	// Routing priority tests
 	t.Run("routing_priority", func(t *testing.T) {
 		tree := SetupTree()
 
 		staticHandler := CreateHandlerWithResponse("static admin")
 		wildcardHandler := CreateHandlerWithResponse("wildcard user")
 
-		// 와일드카드 먼저 등록
+		// Register wildcard first
 		err := tree.SetHandler(tree.StringToMethodType("GET"), "/users/:id", wildcardHandler)
 		AssertNoError(t, err, "SetHandler wildcard")
 
-		// 정적 라우트 나중에 등록
+		// Register static route later
 		err = tree.SetHandler(tree.StringToMethodType("GET"), "/users/admin", staticHandler)
 		AssertNoError(t, err, "SetHandler static")
 
-		// 정적 라우트가 우선되어야 함
+		// Static route should take precedence
 		recorder := ExecuteRequest(tree, "GET", "/users/admin")
 		AssertStatusCode(t, recorder, http.StatusOK)
 		AssertResponseBody(t, recorder, "static admin")
 
-		// 와일드카드 라우트 테스트
+		// Wildcard route test
 		recorder = ExecuteRequest(tree, "GET", "/users/123")
 		AssertStatusCode(t, recorder, http.StatusOK)
 		AssertResponseBody(t, recorder, "wildcard user")
@@ -186,13 +186,13 @@ func TestGetHandler(t *testing.T) {
 }
 
 // ======================
-// 복합 라우팅 시나리오 테스트
+// Complex Routing Scenario Tests
 // ======================
 
 func TestComplexRouting(t *testing.T) {
 	tree := SetupTree()
 
-	// 복잡한 라우트 구성
+	// Complex route configuration
 	routes := []struct {
 		method   string
 		path     string
@@ -208,14 +208,14 @@ func TestComplexRouting(t *testing.T) {
 		{"GET", "/api/v1/users", "api users"},
 	}
 
-	// 라우트 설정
+	// Route setup
 	for _, route := range routes {
 		handler := CreateHandlerWithResponse(route.response)
 		err := tree.SetHandler(tree.StringToMethodType(route.method), route.path, handler)
 		AssertNoError(t, err, "SetHandler for "+route.path)
 	}
 
-	// 테스트 케이스
+	// Test cases
 	testCases := []HTTPTestCase{
 		{"home", "GET", "/", http.StatusOK, "home"},
 		{"users_list", "GET", "/users", http.StatusOK, "users list"},
@@ -237,7 +237,7 @@ func TestComplexRouting(t *testing.T) {
 }
 
 // ======================
-// 추가 시나리오 테스트
+// Additional Scenario Tests
 // ======================
 
 func TestAdditionalScenarios(t *testing.T) {
@@ -245,7 +245,7 @@ func TestAdditionalScenarios(t *testing.T) {
 		tree := SetupTree()
 		handler := CreateHandlerWithResponse("deep response")
 
-		// 깊은 경로 등록
+		// Register deep path
 		deepPath := "/level1/level2/level3/level4/level5/deep"
 		err := tree.SetHandler(tree.StringToMethodType("GET"), deepPath, handler)
 		AssertNoError(t, err, "SetHandler for deep path")
@@ -259,7 +259,7 @@ func TestAdditionalScenarios(t *testing.T) {
 		tree := SetupTree()
 		handler := CreateHandlerWithResponse("response")
 
-		// 다양한 패턴의 라우트 등록
+		// Register various route patterns
 		routes := []string{
 			"/simple",
 			"/with-hyphen",
@@ -273,7 +273,7 @@ func TestAdditionalScenarios(t *testing.T) {
 			AssertNoError(t, err, "SetHandler for route "+route)
 		}
 
-		// 등록된 라우트들 테스트
+		// Test registered routes
 		for _, route := range routes {
 			recorder := ExecuteRequest(tree, "GET", route)
 			AssertStatusCode(t, recorder, http.StatusOK)

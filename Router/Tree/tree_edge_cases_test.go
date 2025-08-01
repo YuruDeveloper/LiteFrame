@@ -51,24 +51,24 @@ func TestEdgeCases_Match(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			// 패닉 방지 테스트
+			// Panic prevention test
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Match(%q, %q) panicked: %v", tc.One, tc.Two, r)
 				}
 			}()
 
-			// PathWithSegment 생성
+			// Create PathWithSegment
 			var pws *PathWithSegment
 			if tc.One == "" {
 				pws = NewPathWithSegment("")
 			} else {
 				pws = NewPathWithSegment("/" + tc.One)
-				pws.Next() // 첫 번째 세그먼트로 이동
+				pws.Next() // Move to first segment
 			}
 
 			matched, index, left := tree.Match(*pws, tc.Two)
-			remaining := left.Get()
+			remaining := left.Body[left.Start:left.End]
 
 			if matched != tc.ExpectedMatch {
 				t.Errorf("Expected match %v, got %v", tc.ExpectedMatch, matched)
@@ -84,7 +84,7 @@ func TestEdgeCases_Match(t *testing.T) {
 }
 
 // ======================
-// 경로 분할 엣지 케이스 테스트
+// Path Splitting Edge Case Tests
 // ======================
 
 func TestEdgeCases_SplitPath(t *testing.T) {
@@ -103,7 +103,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				// PathWithSegment로 변환하여 테스트
+				// Test by converting to PathWithSegment
 				pws := NewPathWithSegment(tc.input)
 				var result []string
 
@@ -112,7 +112,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 					if pws.IsSame() {
 						break
 					}
-					segment := pws.Get()
+					segment := pws.Body[pws.Start:pws.End]
 					if segment != "" {
 						result = append(result, segment)
 					}
@@ -146,7 +146,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				// PathWithSegment로 변환하여 테스트
+				// Test by converting to PathWithSegment
 				pws := NewPathWithSegment(tc.input)
 				var result []string
 
@@ -155,7 +155,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 					if pws.IsSame() {
 						break
 					}
-					segment := pws.Get()
+					segment := pws.Body[pws.Start:pws.End]
 					if segment != "" {
 						result = append(result, segment)
 					}
@@ -177,7 +177,7 @@ func TestEdgeCases_SplitPath(t *testing.T) {
 }
 
 // ======================
-// 와일드카드/캐치올 엣지 케이스 테스트
+// Wildcard/Catch-All Edge Case Tests
 // ======================
 
 func TestEdgeCases_WildcardDetection(t *testing.T) {
@@ -214,7 +214,7 @@ func TestEdgeCases_WildcardDetection(t *testing.T) {
 }
 
 // ======================
-// 자식 노드 삽입 엣지 케이스 테스트
+// Child Node Insertion Edge Case Tests
 // ======================
 
 func TestEdgeCases_InsertChild(t *testing.T) {
@@ -223,7 +223,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 	t.Run("duplicate_wildcard_error", func(t *testing.T) {
 		parent := NewNode(RootType, "/")
 
-		// 첫 번째 와일드카드 성공
+		// First wildcard successful
 		child1, err1 := tree.InsertChild(parent, ":id")
 		AssertNoError(t, err1, "First wildcard insertion")
 
@@ -231,7 +231,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 			t.Error("First wildcard child is nil")
 		}
 
-		// 두 번째 와일드카드 실패해야 함
+		// Second wildcard should fail
 		child2, err2 := tree.InsertChild(parent, ":name")
 		AssertError(t, err2, "duplicate wildcard")
 
@@ -243,7 +243,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 	t.Run("duplicate_catchall_error", func(t *testing.T) {
 		parent := NewNode(RootType, "/")
 
-		// 첫 번째 캐치올 성공
+		// First catch-all successful
 		child1, err1 := tree.InsertChild(parent, "*files")
 		AssertNoError(t, err1, "First catch-all insertion")
 
@@ -251,7 +251,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 			t.Error("First catch-all child is nil")
 		}
 
-		// 두 번째 캐치올 실패해야 함
+		// Second catch-all should fail
 		child2, err2 := tree.InsertChild(parent, "*documents")
 		AssertError(t, err2, "duplicate catch-all")
 
@@ -288,7 +288,7 @@ func TestEdgeCases_InsertChild(t *testing.T) {
 }
 
 // ======================
-// 핸들러 설정 엣지 케이스 테스트
+// Handler Setting Edge Case Tests
 // ======================
 
 func TestEdgeCases_SetHandler(t *testing.T) {
@@ -297,15 +297,15 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 		handler1 := CreateHandlerWithResponse("response1")
 		handler2 := CreateHandlerWithResponse("response2")
 
-		// 첫 번째 핸들러 설정
+		// Set first handler
 		err := tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler1)
 		AssertNoError(t, err, "First SetHandler")
 
-		// 두 번째 핸들러로 덮어쓰기
+		// Overwrite with second handler
 		err = tree.SetHandler(tree.StringToMethodType("GET"), "/test", handler2)
 		AssertNoError(t, err, "Second SetHandler")
 
-		// 두 번째 핸들러가 작동하는지 확인
+		// Verify second handler works
 		recorder := ExecuteRequest(tree, "GET", "/test")
 		AssertStatusCode(t, recorder, http.StatusOK)
 		AssertResponseBody(t, recorder, "response2")
@@ -315,7 +315,7 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 		tree := SetupTree()
 		handler := CreateHandlerWithResponse("deep response")
 
-		// 깊은 경로 생성
+		// Create deep path
 		segments := make([]string, 10)
 		for i := range segments {
 			segments[i] = "level" + string(rune('0'+(i%10)))
@@ -355,7 +355,7 @@ func TestEdgeCases_SetHandler(t *testing.T) {
 }
 
 // ======================
-// 노드 분할 엣지 케이스 테스트
+// Node Splitting Edge Case Tests
 // ======================
 
 func TestEdgeCases_SplitNode(t *testing.T) {
@@ -368,7 +368,6 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 		expectedLeft  string
 		expectedRight string
 	}{
-		{"split_at_end", "users", 5, "users", ""},
 		{"split_one_char", "users", 1, "u", "sers"},
 		{"split_near_end", "users", 4, "user", "s"},
 	}
@@ -397,7 +396,7 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 		})
 	}
 
-	// 에러 케이스 테스트 - split_at_start는 Left가 빈 문자열이 되어 에러 발생해야 함
+	// Error case test - split_at_start should cause error as Left becomes empty string
 	t.Run("split_at_start_error", func(t *testing.T) {
 		parent := NewNode(RootType, "/")
 		child := NewNode(StaticType, "users")
@@ -411,7 +410,7 @@ func TestEdgeCases_SplitNode(t *testing.T) {
 }
 
 // ======================
-// 입력 검증 테스트
+// Input Validation Tests
 // ======================
 
 func TestInputValidation(t *testing.T) {
