@@ -5,7 +5,7 @@ package Tree
 import (
 	"LiteFrame/Router/Error"
 	"LiteFrame/Router/Middleware"
-	"LiteFrame/Router/Param"
+	"LiteFrame/Router/Param"	
 	"net/http"
 	"sort"
 )
@@ -216,16 +216,24 @@ func (instance *Tree) SetHandler(method MethodType, rawPath string, handler Hand
 		return nil
 	}
 	parent := instance.RootNode
-setHelper:
+	setHelper:
 	for {
 		if path.IsSame() {
 			parent.Handlers[method] = handler
 			break
 		}
-		index := sort.Search(len(parent.Indices), func(index int) bool {
-			return parent.Indices[index] >= path.Body[path.Start]
-		})
-		if index < len(parent.Indices) && parent.Indices[index] == path.Body[path.Start] {
+		low , index , high := 0, 0, len(parent.Indices) -1
+		Target :=  path.Body[path.Start] 
+		for low <= high {
+			index = (low + high) >> 1 
+			if parent.Indices[index] < Target {
+				low = index + 1
+			} else {
+				high = index - 1
+			}
+		}
+		if low < len(parent.Indices)  {
+			index = low
 			matched, matchingPoint, left := instance.Match(*path, parent.Children[index].Path)
 			if matched {
 				path.Next()
@@ -279,52 +287,64 @@ func (instance *Tree) GetHandler(request *http.Request, getParams func() *Param.
 	if method == NotAllowed {
 		return instance.NotAllowedHandler, nil
 	}
+	if path.Body == "/" || path.Body == "" {
+		return instance.SelectHandler(instance.RootNode,method) , params
+	}
 	path.Next()
-	node := instance.RootNode
+	parent := instance.RootNode
 getHelper:
 	for {
 		if path.GetLength() == 0 {
-			return instance.SelectHandler(node, method), params
+			return instance.SelectHandler(parent, method), params
 		}
-		index := sort.Search(len(node.Indices), func(i int) bool {
-			return node.Indices[i] >= path.Body[path.Start]
-		})
-
-		if index < len(node.Indices) && node.Indices[index] == path.Body[path.Start] {
-			childNode := node.Children[index]
+		low , mid , high := 0, 0, len(parent.Indices) -1
+		Target := path.Body[path.Start]
+		for low <= high {
+			mid = (low + high) >> 1 
+			if parent.Indices[mid] < Target {
+				low = mid + 1
+			} else {
+				high = mid -1 
+			}
+		}
+		if low < len(parent.Indices)  {
+			childNode := parent.Children[low]
 			matched, matchingPoint, left := instance.Match(*path, childNode.Path)
-			switch {
-			case matched:
+		
+			if matched {
 				path.Next()
-				node = childNode
+				parent = childNode
 				continue getHelper
-			case matchingPoint > 0 && matchingPoint == len(childNode.Path) && path.GetLength() > 0:
-				node = childNode
+			}
+
+			if matchingPoint > 0 && matchingPoint == len(childNode.Path) && path.GetLength() > 0 {
+				parent = childNode
 				path = &left
 				continue getHelper
 			}
 		}
+
 		// 2nd priority: WildCard node matching (single segment capture)
-		if node.WildCard != nil {
+		if parent.WildCard != nil {
 			if params == nil {
 				params = getParams()
 			}
 			// Store current segment as parameter and proceed to next segment
-			params.Add(node.WildCard.Param, path.Body[path.Start:path.End])
+			params.Add(parent.WildCard.Param, path.Body[path.Start:path.End])
 			path.Next()
-			node = node.WildCard
+			parent = parent.WildCard
 			continue getHelper
 		}
 		// 3rd priority: CatchAll node matching (capture all remaining paths)
-		if node.CatchAll != nil {
+		if parent.CatchAll != nil {
 			if params == nil {
 				params = getParams()
 			}
 			// Store remaining path of PathWithSegment as single parameter
-			params.Add(node.CatchAll.Param, path.Body[path.Start:])
+			params.Add(parent.CatchAll.Param, path.Body[path.Start:])
 			path.Start = path.End
 			// Search handler in CatchAll node with empty path (path consumption complete)
-			node = node.CatchAll
+			parent = parent.CatchAll
 			continue getHelper
 		}
 		// Return parameter object and 404 handler when no matching route found
